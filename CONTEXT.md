@@ -78,6 +78,12 @@ Migrations (à appliquer dans l'ordre) :
 - **Mode hors ligne** : voir `docs/ARCHITECTURE.md` (file d'envoi SQLite, périmètre et limites).
 - Le **rôle technicien** n'a pas le droit d'uploader de l'audio (lecture seule des fichiers).
 
+## Dépôt et intégration continue
+
+- Dépôt GitHub (privé) : `chadracklonde/radioflow`, branche `main`.
+- Le workflow CI (`.github/workflows/ci.yml`) vérifie l'application Flutter (analyse + tests), les migrations et la sécurité de la base sur PostgreSQL 16, les types de la fonction serveur et l'absence de secrets. Premier passage : 4 jobs verts.
+- Les compilations par plateforme (`build.yml`, lancement manuel) n'ont pas encore été exécutées.
+
 ## Structure du dépôt
 
 ```

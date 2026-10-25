@@ -1,5 +1,7 @@
 # Radio Flow
 
+[![CI](https://github.com/chadracklonde/radioflow/actions/workflows/ci.yml/badge.svg)](https://github.com/chadracklonde/radioflow/actions/workflows/ci.yml)
+
 Application multiplateforme (Android, iOS, macOS, Windows) qui structure la production d'une station radio : forum de rédaction, fils de discussion par sujet, conducteur dynamique, espace son avec nommage automatique des fichiers audio, tâches de l'équipe et tableau de bord avec export PDF / Excel.
 
 Conçue par Chadrack Tambwe Londe pour RTC-MALI. Le cahier des charges et les décisions de conception sont résumés dans [`CONTEXT.md`](CONTEXT.md).
