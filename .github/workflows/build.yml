@@ -5,12 +5,19 @@ name: Build des plateformes
 # des ajustements (signature, versions des outils Android / Xcode...).
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: "Plateforme à compiler (les builds macOS et iOS consomment 10x plus de minutes)"
+        type: choice
+        options: [android, windows, macos, ios, toutes]
+        default: android
 
 permissions:
   contents: read
 
 jobs:
   android:
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'toutes' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,6 +41,7 @@ jobs:
           path: radio_flow/build/app/outputs/flutter-apk/app-debug.apk
 
   windows:
+    if: ${{ inputs.platform == 'windows' || inputs.platform == 'toutes' }}
     runs-on: windows-latest
     defaults:
       run:
@@ -53,6 +61,7 @@ jobs:
           path: radio_flow/build/windows/x64/runner/Release
 
   macos:
+    if: ${{ inputs.platform == 'macos' || inputs.platform == 'toutes' }}
     runs-on: macos-latest
     defaults:
       run:
@@ -68,6 +77,7 @@ jobs:
       - run: flutter build macos --release
 
   ios:
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'toutes' }}
     runs-on: macos-latest
     defaults:
       run:
