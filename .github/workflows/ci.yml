@@ -40,6 +40,48 @@ jobs:
       - name: Tests
         run: flutter test
 
+  android:
+    name: Android (compilation version de production)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: radio_flow
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+
+      - run: flutter pub get
+
+      # Signée avec la clé de debug : suffisante pour tester, pas pour publier sur le Play Store.
+      - name: Compilation (release)
+        run: flutter build apk --release
+
+      # Une version de production sans cette permission ne peut joindre aucun serveur.
+      - name: Vérifier les permissions de l'APK de production
+        run: |
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          "$AAPT2" dump permissions "$APK" | tee permissions.txt
+          grep -q "android.permission.INTERNET" permissions.txt \
+            || { echo "ECHEC : permission INTERNET absente de l'APK de production."; exit 1; }
+          "$AAPT2" dump badging "$APK" | grep -E "^(package|application-label):"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radio-flow-android-release
+          path: radio_flow/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
   database:
     name: Base de données (migrations + sécurité)
     runs-on: ubuntu-latest
