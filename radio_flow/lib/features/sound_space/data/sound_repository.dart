@@ -1,0 +1,176 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mime/mime.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/utils/audio_naming.dart';
+import '../domain/sound_file.dart';
+import 'audio_services.dart';
+
+/// Un fichier de ce nom existe déjà dans l'édition.
+class DuplicateAudioException implements Exception {
+  const DuplicateAudioException(this.name);
+  final String name;
+}
+
+abstract class SoundRepository {
+  Future<List<SoundFile>> fetchFiles(String isoDate);
+
+  /// Émet à chaque changement de messages (pour rafraîchir la liste).
+  Stream<void> changes();
+
+  /// Envoie le fichier sous son nom automatique et publie le message dans le fil.
+  /// Renvoie le nom renommé.
+  Future<String> upload({
+    required String conductorId,
+    required String threadId,
+    required String userId,
+    required int position,
+    required DateTime date,
+    required String originalName,
+    required Uint8List bytes,
+  });
+
+  Future<String> signedUrl(String path);
+  Future<Uint8List> download(String path);
+}
+
+class SupabaseSoundRepository implements SoundRepository {
+  SupabaseSoundRepository(this._client);
+  final SupabaseClient _client;
+
+  static const _bucket = 'conductor-audio';
+
+  @override
+  Future<List<SoundFile>> fetchFiles(String isoDate) async {
+    final rows = await _client
+        .from('sound_files')
+        .select()
+        .eq('broadcast_date', isoDate)
+        .order('broadcast_time')
+        .order('position_index')
+        .order('uploaded_at');
+    return rows.map(SoundFile.fromJson).toList();
+  }
+
+  @override
+  Stream<void> changes() {
+    final controller = StreamController<void>();
+    final channel = _client
+        .channel('sound-files-${DateTime.now().microsecondsSinceEpoch}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'messages',
+          callback: (_) => controller.add(null),
+        )
+        .subscribe();
+    controller.onCancel = () => _client.removeChannel(channel);
+    return controller.stream;
+  }
+
+  @override
+  Future<String> upload({
+    required String conductorId,
+    required String threadId,
+    required String userId,
+    required int position,
+    required DateTime date,
+    required String originalName,
+    required Uint8List bytes,
+  }) async {
+    final stored = audioStoredName(
+      position: position,
+      originalName: originalName,
+      date: date,
+    );
+    final path = '$conductorId/$stored';
+    try {
+      await _client.storage
+          .from(_bucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: lookupMimeType(stored) ?? 'application/octet-stream',
+              upsert: false,
+            ),
+          );
+    } on StorageException catch (e) {
+      if (e.statusCode == '409' ||
+          e.message.toLowerCase().contains('already exists')) {
+        throw DuplicateAudioException(stored);
+      }
+      rethrow;
+    }
+    try {
+      await _client.from('messages').insert({
+        'thread_id': threadId,
+        'user_id': userId,
+        'audio_file_url': path,
+        'audio_original_name': originalName,
+      });
+    } catch (_) {
+      // Pas de fichier orphelin si le message n'a pas pu être publié.
+      await _client.storage.from(_bucket).remove([path]);
+      rethrow;
+    }
+    return stored;
+  }
+
+  @override
+  Future<String> signedUrl(String path) =>
+      _client.storage.from(_bucket).createSignedUrl(path, 3600);
+
+  @override
+  Future<Uint8List> download(String path) =>
+      _client.storage.from(_bucket).download(path);
+}
+
+final soundRepositoryProvider = Provider<SoundRepository>(
+  (ref) => SupabaseSoundRepository(Supabase.instance.client),
+);
+
+final soundFilesProvider = FutureProvider.autoDispose
+    .family<List<SoundFile>, String>((ref, isoDate) {
+      final repo = ref.watch(soundRepositoryProvider);
+      final sub = repo.changes().listen((_) => ref.invalidateSelf());
+      ref.onDispose(sub.cancel);
+      return repo.fetchFiles(isoDate);
+    });
+
+/// Chemin du fichier en cours de lecture (null si aucun).
+class NowPlaying extends Notifier<String?> {
+  StreamSubscription<void>? _sub;
+
+  @override
+  String? build() => null;
+
+  Future<void> toggle(
+    String path,
+    AudioPlayerService player,
+    SoundRepository repo,
+  ) async {
+    if (state == path) {
+      await player.stop();
+      state = null;
+      return;
+    }
+    await _sub?.cancel();
+    state = path;
+    try {
+      final url = await repo.signedUrl(path);
+      await player.play(url);
+      _sub = player.completed.listen((_) => state = null);
+    } catch (_) {
+      state = null;
+      rethrow;
+    }
+  }
+}
+
+final nowPlayingProvider = NotifierProvider<NowPlaying, String?>(
+  NowPlaying.new,
+);

@@ -1,0 +1,22 @@
+# Système / éditeurs
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Secrets : ne jamais versionner
+.env
+.env.*
+*.pem
+*.p12
+*.jks
+key.properties
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+
+# Sorties de test / temporaires
+*.log
+coverage/

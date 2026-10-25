@@ -1,0 +1,83 @@
+name: Build des plateformes
+
+# Lancement manuel (Actions > Build des plateformes > Run workflow).
+# Ces compilations n'ont pas encore été exécutées : les premiers essais peuvent demander
+# des ajustements (signature, versions des outils Android / Xcode...).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: radio_flow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radio-flow-android-debug
+          path: radio_flow/build/app/outputs/flutter-apk/app-debug.apk
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: radio_flow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radio-flow-windows
+          path: radio_flow/build/windows/x64/runner/Release
+
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: radio_flow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter build macos --release
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: radio_flow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
