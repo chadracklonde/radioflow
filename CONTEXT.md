@@ -90,7 +90,8 @@ Migrations (à appliquer dans l'ordre) :
 
 - Dépôt GitHub (privé) : `chadracklonde/radioflow`, branche `main`.
 - Le workflow CI (`.github/workflows/ci.yml`) vérifie l'application Flutter (analyse + tests), les migrations et la sécurité de la base sur PostgreSQL 16, les types de la fonction serveur et l'absence de secrets. Premier passage : 4 jobs verts.
-- Les compilations par plateforme (`build.yml`, lancement manuel) n'ont pas encore été exécutées.
+- Android est compilé à chaque envoi (version de production, permission Internet vérifiée dans l'APK) : 5 jobs verts. Les autres plateformes se compilent à la demande (`build.yml`, choix de la plateforme); seul Android a été exécuté pour l'instant.
+- Réglages de plateforme nécessaires à l'accès réseau : permission `INTERNET` dans le manifeste Android principal, droits `network.client` et `files.user-selected.read-write` dans les entitlements macOS (application sandboxée).
 
 ## Structure du dépôt
 

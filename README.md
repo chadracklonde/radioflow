@@ -86,11 +86,14 @@ Note : `flutter_launcher_icons` remplace à tort un réglage du fichier de proje
 Le workflow [`CI`](.github/workflows/ci.yml) s'exécute à chaque envoi et chaque demande de fusion :
 
 - **Flutter** : `flutter analyze` et `flutter test` (tests de widgets, accessibilité WCAG, hors ligne, exports).
+- **Android** : compilation de la version de production (APK de 71 Mo, signé avec la clé de debug), avec vérification que la permission Internet figure dans l'APK final; l'APK est conservé 14 jours en artefact du workflow.
 - **Base de données** : toutes les migrations sur PostgreSQL 16, puis ~40 contrôles de sécurité (droits par rôle, verrouillage, super administrateur...).
 - **Fonction serveur** : `deno check`.
 - **Secrets** : refuse tout secret versionné.
 
-Le workflow [`Build des plateformes`](.github/workflows/build.yml) (lancement manuel) compile Android, Windows, macOS et iOS. Il n'a pas encore été exécuté.
+Le workflow [`Build des plateformes`](.github/workflows/build.yml) (lancement manuel, avec choix de la plateforme) compile Android, Windows, macOS et iOS. Android a été exécuté avec succès; Windows, macOS et iOS n'ont pas encore été lancés.
+
+Pour installer l'APK Android sur un téléphone : Actions > dernier passage du CI > artefact `radio-flow-android-release`, puis autoriser l'installation d'applications de sources inconnues. Cette version n'est pas signée pour le Play Store (clé de debug).
 
 ## État et limites connues
 
