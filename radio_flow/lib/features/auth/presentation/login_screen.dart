@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/brand_mark.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -61,28 +62,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.graphic_eq,
-                            color: c.success,
-                            size: 32,
-                            semanticLabel: 'Radio Flow',
-                          ),
-                          const SizedBox(width: Space.md),
-                          Expanded(
-                            child: Text(
-                              'Radio Flow',
-                              style: text.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Space.sm),
+                      const Center(child: BrandLogo()),
+                      const SizedBox(height: Space.xl),
                       Text(
                         'Connectez-vous à la rédaction',
+                        textAlign: TextAlign.center,
                         style: text.bodyMedium?.copyWith(
                           color: c.mutedForeground,
                         ),

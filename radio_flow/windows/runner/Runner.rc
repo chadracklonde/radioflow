@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "ml.rtcmali" "\0"
-            VALUE "FileDescription", "radio_flow" "\0"
+            VALUE "FileDescription", "Radio Flow" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "radio_flow" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 ml.rtcmali. All rights reserved." "\0"
             VALUE "OriginalFilename", "radio_flow.exe" "\0"
-            VALUE "ProductName", "radio_flow" "\0"
+            VALUE "ProductName", "Radio Flow" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

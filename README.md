@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/branding/radio-flow-logo.jpg" alt="Radio Flow" width="240">
+</p>
+
 # Radio Flow
 
 [![CI](https://github.com/chadracklonde/radioflow/actions/workflows/ci.yml/badge.svg)](https://github.com/chadracklonde/radioflow/actions/workflows/ci.yml)
@@ -64,6 +68,18 @@ update public.users set is_super_admin = true, role = 'admin' where email = 'vou
 ```
 
 Les autres membres se créent ensuite dans l'application : Mon compte > Gérer l'équipe.
+
+## Identité visuelle
+
+Le logo d'origine est dans [`docs/branding/`](docs/branding/radio-flow-logo.jpg). Les icônes de l'application (Android adaptatif, iOS, macOS, Windows) et l'emblème utilisé dans l'interface en sont dérivés :
+
+```bash
+python3 tools/make_brand_assets.py                    # produit radio_flow/assets/branding/*.png (Pillow + NumPy)
+cd radio_flow && dart run flutter_launcher_icons      # écrit les icônes de chaque plateforme
+git checkout -- ios/Runner.xcodeproj/project.pbxproj  # voir la note ci-dessous
+```
+
+Note : `flutter_launcher_icons` remplace à tort un réglage du fichier de projet iOS (`ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS`) par `AppIcon`. Il faut annuler cette modification avec la dernière commande.
 
 ## Qualité et CI
 

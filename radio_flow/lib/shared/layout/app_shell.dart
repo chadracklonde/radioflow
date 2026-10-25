@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/responsive/breakpoints.dart';
 import '../widgets/sync_banner.dart';
+import '../widgets/brand_mark.dart';
 import 'destinations.dart';
 
 /// Coque de navigation adaptative : barre basse sur téléphone, rail latéral sur bureau.
@@ -34,6 +35,10 @@ class AppShell extends ConsumerWidget {
             body: Row(
               children: [
                 NavigationRail(
+                  leading: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: BrandEmblem(size: 48),
+                  ),
                   selectedIndex: navigationShell.currentIndex,
                   onDestinationSelected: _select,
                   extended: constraints.maxWidth >= 1200,

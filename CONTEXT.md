@@ -78,6 +78,14 @@ Migrations (à appliquer dans l'ordre) :
 - **Mode hors ligne** : voir `docs/ARCHITECTURE.md` (file d'envoi SQLite, périmètre et limites).
 - Le **rôle technicien** n'a pas le droit d'uploader de l'audio (lecture seule des fichiers).
 
+## Identité visuelle
+
+- Logo fourni par le concepteur : emblème en forme d'onde sonore dans un cercle (dégradé jaune, bleu, vert) et mot-symbole « RADIO FLOW » (RADIO en blanc, FLOW en italique dégradé orange vers bleu), sur fond gris très sombre. Original : `docs/branding/radio-flow-logo.jpg`.
+- Ressources dérivées (script `tools/make_brand_assets.py`) : emblème détouré (`logo_emblem.png`, seul fichier embarqué dans l'application), icône carrée iOS, avant-plan et arrière-plan de l'icône adaptative Android (emblème à 62 % du canevas, dans la zone sûre), icône Windows à coins arrondis, icône macOS au gabarit Apple.
+- Dans l'interface : l'emblème est posé sur une tuile sombre (comme l'icône) pour rester lisible dans les deux thèmes; le mot-symbole est dessiné en texte, avec des teintes de dégradé ajustées au thème pour garder un bon contraste. Le logo complet figure sur l'écran de connexion, l'emblème en tête du rail latéral sur bureau.
+- Nom affiché de l'application : « Radio Flow » (Android, iOS, macOS, fenêtre et propriétés Windows).
+- Le vert d'accent de l'interface (`#22C55E`) est proche du vert du logo; le jaune et le bleu ne sont utilisés que dans le logo.
+
 ## Dépôt et intégration continue
 
 - Dépôt GitHub (privé) : `chadracklonde/radioflow`, branche `main`.

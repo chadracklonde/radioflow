@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:radio_flow/app.dart';
 import 'package:radio_flow/features/auth/data/auth_repository.dart';
+import 'package:radio_flow/shared/widgets/brand_mark.dart';
 
 class FakeAuth implements AuthRepository {
   @override
@@ -95,6 +96,7 @@ void main() {
     await login(tester);
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(BrandEmblem), findsOneWidget); // emblème en tête du rail
   });
 
   testWidgets('erreur de connexion affichée', (tester) async {
