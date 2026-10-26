@@ -31,7 +31,7 @@ Tâches : tâches de toute l'équipe en temps réel, filtres En cours / Terminé
 
 Espace Son : envoi d'un audio depuis un fil (bouton pièce jointe; formats mp3, wav, m4a, aac, ogg, flac, wma; 50 Mo maximum), nommage automatique `[Position]_[Nom_Original]_[Date].[ext]` avec la date de diffusion de l'édition, stockage dans `conductor-audio/{conductor_id}/`, liste de la journée groupée par édition, lecture intégrée (lien signé d'une heure) et téléchargement. Pas encore fait : détection de la durée des fichiers, suppression d'un fichier, lecture sur appareil réel.
 
-Conducteur : navigation par date, génération des éditions d'après la grille (admin), lignes avec réordonnancement et statuts, verrouillage, fil de discussion par ligne en temps réel (texte; l'envoi d'audio arrive avec l'Espace Son). 114 tests au total.
+Conducteur : navigation par date, génération des éditions d'après la grille (admin; si la grille est vide ou sans créneau pour ce jour de la semaine, l'écran l'explique et ouvre la grille; une icône génère aussi les éditions manquantes quand certaines existent déjà; la grille se règle par créneau avec ses jours de diffusion et permet la suppression), lignes avec réordonnancement et statuts, verrouillage, fil de discussion par ligne en temps réel (texte; l'envoi d'audio arrive avec l'Espace Son). 135 tests au total.
 
 À noter : le nommage des fichiers audio utilise la position de la ligne; réordonner des lignes après upload ne renomme pas les fichiers existants.
 

@@ -32,6 +32,12 @@ class ConductorScreen extends ConsumerWidget {
             trailing: [
               if (isAdmin)
                 IconButton(
+                  tooltip: 'Générer les conducteurs manquants',
+                  icon: const Icon(Icons.auto_awesome),
+                  onPressed: () => generateForDate(context, ref, date),
+                ),
+              if (isAdmin)
+                IconButton(
                   tooltip: 'Grille de la station',
                   icon: const Icon(Icons.calendar_view_week),
                   onPressed: () => showSlotsDialog(context),
@@ -73,6 +79,35 @@ class ConductorScreen extends ConsumerWidget {
   }
 }
 
+/// Crée les conducteurs manquants du jour d'après la grille et dit clairement ce qui s'est passé.
+Future<void> generateForDate(
+  BuildContext context,
+  WidgetRef ref,
+  DateTime date,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  String message;
+  try {
+    final n = await ref.read(conductorRepositoryProvider).generate(date);
+    message = n == 0
+        ? 'Rien à créer : tous les créneaux de la grille existent déjà pour ce jour, ou aucun ne correspond.'
+        : '$n conducteur${n > 1 ? 's' : ''} créé${n > 1 ? 's' : ''}.';
+  } catch (_) {
+    message = 'La génération a échoué. Vérifiez la connexion et réessayez.';
+  }
+  messenger.showSnackBar(SnackBar(content: Text(message)));
+}
+
+const _dayNames = [
+  'lundi',
+  'mardi',
+  'mercredi',
+  'jeudi',
+  'vendredi',
+  'samedi',
+  'dimanche',
+];
+
 class _Empty extends ConsumerStatefulWidget {
   const _Empty({required this.date, required this.isAdmin});
   final DateTime date;
@@ -87,57 +122,78 @@ class _EmptyState extends ConsumerState<_Empty> {
 
   Future<void> _generate() async {
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final n = await ref
-          .read(conductorRepositoryProvider)
-          .generate(widget.date);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            n == 0
-                ? 'Aucun créneau de la grille ne correspond à ce jour. Configurez la grille.'
-                : '$n conducteur${n > 1 ? 's' : ''} créé${n > 1 ? 's' : ''}.',
-          ),
-        ),
-      );
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('La génération a échoué. Réessayez.')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await generateForDate(context, ref, widget.date);
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final muted = TextStyle(color: c.mutedForeground);
+    final slots = ref.watch(slotsProvider);
+    final day = _dayNames[widget.date.weekday - 1];
+
+    String? guidance;
+    var needsGrid = false;
+    if (widget.isAdmin) {
+      final list = slots.value;
+      if (list != null && list.isEmpty) {
+        guidance = 'La grille de la station est vide : ajoutez vos créneaux (ex. Flash de 07h, Journal de 12h) pour pouvoir générer les conducteurs.';
+        needsGrid = true;
+      } else if (list != null && !list.any((s) => s.airsOn(widget.date))) {
+        guidance = 'Aucun créneau de la grille n’est prévu le $day.';
+        needsGrid = true;
+      }
+    }
+
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(Space.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.view_list_outlined, size: 40, color: c.mutedForeground),
             const SizedBox(height: Space.md),
-            Text(
-              'Aucun conducteur ce jour-là.',
-              style: TextStyle(color: c.mutedForeground),
-            ),
+            Text('Aucun conducteur ce jour-là.', style: muted),
+            if (!widget.isAdmin) ...[
+              const SizedBox(height: Space.sm),
+              Text(
+                'Le rédacteur en chef les génère d’après la grille de la station.',
+                textAlign: TextAlign.center,
+                style: muted,
+              ),
+            ],
+            if (guidance != null) ...[
+              const SizedBox(height: Space.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Text(
+                  guidance,
+                  textAlign: TextAlign.center,
+                  style: muted,
+                ),
+              ),
+            ],
             if (widget.isAdmin) ...[
               const SizedBox(height: Space.lg),
-              FilledButton.icon(
-                onPressed: _busy ? null : _generate,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome),
-                label: const Text('Générer d’après la grille'),
-              ),
+              if (needsGrid)
+                FilledButton.icon(
+                  onPressed: () => showSlotsDialog(context),
+                  icon: const Icon(Icons.calendar_view_week),
+                  label: const Text('Configurer la grille'),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: _busy ? null : _generate,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome),
+                  label: const Text('Générer d’après la grille'),
+                ),
             ],
           ],
         ),

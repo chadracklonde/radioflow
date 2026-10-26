@@ -126,17 +126,29 @@ class BroadcastSlot {
     required this.title,
     required this.time,
     required this.active,
+    this.weekdays = allWeekdays,
   });
   final String id;
   final String title;
   final String time; // HH:mm
   final bool active;
 
+  /// Jours de diffusion, 1 = lundi … 7 = dimanche (comme `DateTime.weekday`).
+  final List<int> weekdays;
+
+  static const allWeekdays = [1, 2, 3, 4, 5, 6, 7];
+
+  bool airsOn(DateTime date) => active && weekdays.contains(date.weekday);
+
   factory BroadcastSlot.fromJson(Map<String, dynamic> j) => BroadcastSlot(
     id: j['id'] as String,
     title: j['title'] as String,
     time: (j['broadcast_time'] as String).substring(0, 5),
     active: j['active'] as bool,
+    weekdays: [
+      for (final d in (j['weekdays'] as List?) ?? allWeekdays)
+        (d as num).toInt(),
+    ],
   );
 }
 

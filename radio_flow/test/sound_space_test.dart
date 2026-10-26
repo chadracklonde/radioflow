@@ -77,7 +77,13 @@ class _Conductors implements ConductorRepository {
   @override
   Future<int> generate(DateTime date) async => 0;
   @override
-  Future<void> addSlot({required String title, required String time}) async {}
+  Future<void> addSlot({
+    required String title,
+    required String time,
+    List<int> weekdays = BroadcastSlot.allWeekdays,
+  }) async {}
+  @override
+  Future<void> removeSlot(String id) async {}
   @override
   Future<String> addLine({
     required String conductorId,

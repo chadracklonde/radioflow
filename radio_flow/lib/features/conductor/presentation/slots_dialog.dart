@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/conductor_repository.dart';
+import '../domain/conductor_models.dart';
 
 Future<void> showSlotsDialog(BuildContext context) =>
     showDialog<void>(context: context, builder: (_) => const _SlotsDialog());
@@ -20,6 +21,7 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
   final _title = TextEditingController();
   TimeOfDay _time = const TimeOfDay(hour: 7, minute: 0);
   String? _error;
+  final _days = <int>{...BroadcastSlot.allWeekdays};
 
   @override
   void dispose() {
@@ -35,10 +37,18 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
       setState(() => _error = 'Donnez un nom au créneau (ex. Flash).');
       return;
     }
+    if (_days.isEmpty) {
+      setState(() => _error = 'Choisissez au moins un jour de diffusion.');
+      return;
+    }
     try {
       await ref
           .read(conductorRepositoryProvider)
-          .addSlot(title: _title.text, time: _timeText);
+          .addSlot(
+            title: _title.text,
+            time: _timeText,
+            weekdays: (_days.toList()..sort()),
+          );
       _title.clear();
       ref.invalidate(slotsProvider);
       setState(() => _error = null);
@@ -48,6 +58,22 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
       );
     }
   }
+
+  Future<void> _remove(BroadcastSlot s) async {
+    try {
+      await ref.read(conductorRepositoryProvider).removeSlot(s.id);
+      ref.invalidate(slotsProvider);
+      setState(() => _error = null);
+    } catch (_) {
+      setState(() => _error = 'Suppression impossible. Réessayez.');
+    }
+  }
+
+  static const _short = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  String _daysLabel(List<int> days) => days.length == 7
+      ? 'Tous les jours'
+      : days.map((d) => _short[d - 1]).join(' ');
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +113,12 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
                                 ),
                               ),
                               title: Text(s.title),
+                              subtitle: Text(_daysLabel(s.weekdays)),
+                              trailing: IconButton(
+                                tooltip: 'Supprimer ${s.title}',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _remove(s),
+                              ),
                             ),
                         ],
                       ),
@@ -96,6 +128,19 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
                 controller: _title,
                 decoration: const InputDecoration(labelText: 'Nom du créneau'),
                 onSubmitted: (_) => _add(),
+              ),
+              const SizedBox(height: Space.md),
+              Wrap(
+                spacing: Space.xs,
+                children: [
+                  for (var d = 1; d <= 7; d++)
+                    FilterChip(
+                      label: Text(_short[d - 1]),
+                      selected: _days.contains(d),
+                      onSelected: (on) =>
+                          setState(() => on ? _days.add(d) : _days.remove(d)),
+                    ),
+                ],
               ),
               const SizedBox(height: Space.md),
               Row(

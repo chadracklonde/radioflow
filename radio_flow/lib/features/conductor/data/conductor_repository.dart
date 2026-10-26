@@ -13,7 +13,12 @@ abstract class ConductorRepository {
 
   /// Crée les conducteurs de la date d'après la grille; renvoie le nombre créé.
   Future<int> generate(DateTime date);
-  Future<void> addSlot({required String title, required String time});
+  Future<void> addSlot({
+    required String title,
+    required String time,
+    List<int> weekdays = BroadcastSlot.allWeekdays,
+  });
+  Future<void> removeSlot(String id);
 
   /// Ajoute une ligne en fin de conducteur et renvoie son identifiant.
   Future<String> addLine({
@@ -73,11 +78,21 @@ class SupabaseConductorRepository implements ConductorRepository {
   }
 
   @override
-  Future<void> addSlot({required String title, required String time}) async {
+  Future<void> addSlot({
+    required String title,
+    required String time,
+    List<int> weekdays = BroadcastSlot.allWeekdays,
+  }) async {
     await _client.from('broadcast_slots').insert({
       'title': title.trim(),
       'broadcast_time': time,
+      'weekdays': weekdays,
     });
+  }
+
+  @override
+  Future<void> removeSlot(String id) async {
+    await _client.from('broadcast_slots').delete().eq('id', id);
   }
 
   @override

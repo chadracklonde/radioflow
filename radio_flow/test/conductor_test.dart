@@ -41,7 +41,12 @@ class Profiles implements ProfileRepository {
 }
 
 class FakeConductors implements ConductorRepository {
-  FakeConductors({this.conductors = const [], this.lines = const []});
+  FakeConductors({
+    this.conductors = const [],
+    this.lines = const [],
+    this.slots = const [],
+  });
+  List<BroadcastSlot> slots;
   List<Conductor> conductors;
   List<ConductorLine> lines;
   final _changes = StreamController<void>.broadcast();
@@ -61,7 +66,7 @@ class FakeConductors implements ConductorRepository {
   Stream<List<ConductorLine>> watchLines(String conductorId) =>
       _live(() => List.of(lines));
   @override
-  Future<List<BroadcastSlot>> fetchSlots() async => const [];
+  Future<List<BroadcastSlot>> fetchSlots() async => List.of(slots);
 
   @override
   Future<int> generate(DateTime date) async {
@@ -80,7 +85,29 @@ class FakeConductors implements ConductorRepository {
   }
 
   @override
-  Future<void> addSlot({required String title, required String time}) async {}
+  Future<void> addSlot({
+    required String title,
+    required String time,
+    List<int> weekdays = BroadcastSlot.allWeekdays,
+  }) async {
+    calls.add('addSlot:$title:$time:${weekdays.join()}');
+    slots = [
+      ...slots,
+      BroadcastSlot(
+        id: 's${slots.length + 1}',
+        title: title,
+        time: time,
+        active: true,
+        weekdays: weekdays,
+      ),
+    ];
+  }
+
+  @override
+  Future<void> removeSlot(String id) async {
+    calls.add('removeSlot:$id');
+    slots = slots.where((s) => s.id != id).toList();
+  }
 
   @override
   Future<String> addLine({
@@ -222,22 +249,107 @@ void main() {
     expect(formatDuration(15), '0:15');
   });
 
+  const daily = BroadcastSlot(
+    id: 's1',
+    title: 'Journal de 12h',
+    time: '12:00',
+    active: true,
+  );
+
   testWidgets('admin : génère les conducteurs du jour depuis la grille', (
     tester,
   ) async {
-    final (repo, _) = await pump(tester, UserRole.admin);
+    final (repo, _) = await pump(
+      tester,
+      UserRole.admin,
+      conductors: FakeConductors(slots: [daily]),
+    );
     expect(find.text('Aucun conducteur ce jour-là.'), findsOneWidget);
     await tester.tap(find.text('Générer d’après la grille'));
     await tester.pumpAndSettle();
     expect(repo.calls, ['generate']);
     expect(find.text('Journal de 12h'), findsOneWidget);
     expect(find.text('12:00'), findsOneWidget);
+    expect(find.text('1 conducteur créé.'), findsOneWidget);
+  });
+
+  testWidgets('admin : grille vide -> explication et accès à la grille', (
+    tester,
+  ) async {
+    final (repo, _) = await pump(tester, UserRole.admin);
+    expect(
+      find.textContaining('La grille de la station est vide'),
+      findsOneWidget,
+    );
+    expect(find.text('Générer d’après la grille'), findsNothing);
+    await tester.tap(find.text('Configurer la grille'));
+    await tester.pumpAndSettle();
+    expect(find.text('Grille de la station'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Flash');
+    await tester.tap(find.text('Ven'));
+    await tester.pump();
+    await tester.tap(find.text('Ajouter'));
+    await tester.pumpAndSettle();
+    expect(repo.calls, ['addSlot:Flash:07:00:123467']);
+    expect(find.text('Flash'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Supprimer Flash'));
+    await tester.pumpAndSettle();
+    expect(repo.calls.last, 'removeSlot:s1');
+    expect(find.text('Flash'), findsNothing);
+  });
+
+  testWidgets('admin : aucun créneau ce jour de la semaine -> message', (
+    tester,
+  ) async {
+    final other = [
+      for (var d = 1; d <= 7; d++)
+        if (d != DateTime.now().weekday) d,
+    ];
+    await pump(
+      tester,
+      UserRole.admin,
+      conductors: FakeConductors(
+        slots: [
+          BroadcastSlot(
+            id: 's1',
+            title: 'Flash',
+            time: '07:00',
+            active: true,
+            weekdays: other,
+          ),
+        ],
+      ),
+    );
+    expect(
+      find.textContaining('Aucun créneau de la grille n’est prévu'),
+      findsOneWidget,
+    );
+    expect(find.text('Configurer la grille'), findsOneWidget);
+  });
+
+  testWidgets('admin : l’icône génère les conducteurs manquants', (
+    tester,
+  ) async {
+    final (repo, _) = await pump(
+      tester,
+      UserRole.admin,
+      conductors: FakeConductors(
+        conductors: [_conductor(ConductorStatus.open)],
+        slots: [daily],
+      ),
+    );
+    await tester.tap(find.byTooltip('Générer les conducteurs manquants'));
+    await tester.pumpAndSettle();
+    expect(repo.calls, ['generate']);
   });
 
   testWidgets('journaliste : pas de bouton de génération', (tester) async {
     await pump(tester, UserRole.journalist);
     expect(find.text('Aucun conducteur ce jour-là.'), findsOneWidget);
     expect(find.text('Générer d’après la grille'), findsNothing);
+    expect(find.byTooltip('Générer les conducteurs manquants'), findsNothing);
   });
 
   testWidgets('admin : lignes, réordonnancement, ajout, verrouillage', (
