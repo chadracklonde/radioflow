@@ -7,6 +7,8 @@
 //        -> { id, email, temp_password }   (le mot de passe provisoire n'est renvoyé qu'une fois)
 //   { "action": "deactivate", "id": "<uuid>" }
 //   { "action": "reactivate", "id": "<uuid>" }
+//   { "action": "reset_password", "id": "<uuid>" }
+//        -> { id, email, temp_password }   (nouveau mot de passe provisoire, renvoyé une seule fois)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ROLES = ["admin", "journalist", "technician"];
@@ -145,6 +147,27 @@ Deno.serve(async (req: Request) => {
         return json(500, { error: "Mise à jour impossible. Réessayez." });
       }
       return json(200, { id, active: !deactivate });
+    }
+
+    case "reset_password": {
+      const id = String(body.id ?? "");
+      if (!UUID.test(id)) return json(400, { error: "Identifiant invalide." });
+      if (id === session.user.id) {
+        return json(400, { error: "Changez votre propre mot de passe depuis Mon compte." });
+      }
+      const { data: target } = await admin
+        .from("users")
+        .select("email, is_super_admin")
+        .eq("id", id)
+        .maybeSingle();
+      if (!target) return json(404, { error: "Membre introuvable." });
+      if (target.is_super_admin) {
+        return json(400, { error: "Le mot de passe du super administrateur ne se réinitialise pas ici." });
+      }
+      const password = tempPassword();
+      const { error: updateError } = await admin.auth.admin.updateUserById(id, { password });
+      if (updateError) return json(500, { error: "Réinitialisation impossible. Réessayez." });
+      return json(200, { id, email: target.email, temp_password: password });
     }
 
     default:

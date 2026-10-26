@@ -27,6 +27,7 @@ class Profile {
     required this.role,
     this.email = '',
     this.isSuperAdmin = false,
+    this.deputyUntil,
   });
   final String id;
   final String fullName;
@@ -36,8 +37,19 @@ class Profile {
   /// Seul compte autorisé à créer des membres et à attribuer des rôles.
   final bool isSuperAdmin;
 
+  /// Fin de la suppléance en cours : le rôle est alors celui de rédacteur en chef.
+  final DateTime? deputyUntil;
+
+  bool get isDeputy => deputyUntil != null;
+
   bool get isAdmin => role == UserRole.admin;
   bool get canPropose => role == UserRole.admin || role == UserRole.journalist;
+
+  /// Tous les rôles peuvent envoyer des sons (techniciens compris).
+  bool get canSendAudio => true;
+
+  /// Texte à lire à l'antenne : rédacteur en chef et journalistes.
+  bool get canWriteScript => canPropose;
 }
 
 abstract class ProfileRepository {
@@ -57,14 +69,21 @@ class SupabaseProfileRepository implements ProfileRepository {
     if (id == null) return null;
     final row = await _client
         .from('users')
-        .select('id, full_name, role, email, is_super_admin')
+        .select('id, full_name, role, email, is_super_admin, deputy_until')
         .eq('id', id)
         .maybeSingle();
     if (row == null) return null;
+    final deputyUntil = DateTime.tryParse(
+      (row['deputy_until'] as String?) ?? '',
+    )?.toLocal();
+    final deputyActive =
+        deputyUntil != null && deputyUntil.isAfter(DateTime.now());
+    final baseRole = UserRole.parse(row['role'] as String?);
     return Profile(
       id: row['id'] as String,
       fullName: row['full_name'] as String,
-      role: UserRole.parse(row['role'] as String?),
+      deputyUntil: deputyActive ? deputyUntil : null,
+      role: deputyActive ? UserRole.admin : baseRole,
       email: (row['email'] as String?) ?? '',
       isSuperAdmin: (row['is_super_admin'] as bool?) ?? false,
     );

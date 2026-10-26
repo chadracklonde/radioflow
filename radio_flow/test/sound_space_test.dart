@@ -81,9 +81,16 @@ class _Conductors implements ConductorRepository {
     required String title,
     required String time,
     List<int> weekdays = BroadcastSlot.allWeekdays,
+    int? durationSeconds,
   }) async {}
   @override
   Future<void> removeSlot(String id) async {}
+  @override
+  Future<void> setLineScript(String lineId, String? text) async {}
+  @override
+  Future<int> saveAsTemplate(String conductorId) async => 0;
+  @override
+  Future<List<HistoryEntry>> fetchHistory(String conductorId) async => const [];
   @override
   Future<String> addLine({
     required String conductorId,
@@ -393,8 +400,28 @@ void main() {
     expect(find.byTooltip('Envoyer un fichier audio'), findsOneWidget);
   });
 
-  testWidgets('technicien : pas de bouton d’envoi', (tester) async {
-    await pump(tester, 'Conducteur', role: UserRole.technician);
+  testWidgets('technicien : peut envoyer un son', (tester) async {
+    final env = await pump(
+      tester,
+      'Conducteur',
+      role: UserRole.technician,
+      pick: _audio('Habillage.mp3', size: 4),
+    );
+    await openThread(tester);
+    await tester.tap(find.byTooltip('Envoyer un fichier audio'));
+    await tester.pumpAndSettle();
+    expect(env.sound.uploads, hasLength(1));
+  });
+
+  testWidgets('technicien : pas d’envoi sur un conducteur verrouillé', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      'Conducteur',
+      role: UserRole.technician,
+      status: ConductorStatus.locked,
+    );
     await openThread(tester);
     expect(find.byTooltip('Envoyer un fichier audio'), findsNothing);
   });

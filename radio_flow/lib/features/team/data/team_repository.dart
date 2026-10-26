@@ -11,7 +11,14 @@ class TeamMember {
     required this.role,
     required this.active,
     this.isSuperAdmin = false,
+    this.deputyUntil,
   });
+
+  /// Fin de la suppléance en cours (droits du rédacteur en chef), si elle est active.
+  final DateTime? deputyUntil;
+
+  bool get isDeputy =>
+      deputyUntil != null && deputyUntil!.isAfter(DateTime.now());
 
   final String id;
   final String fullName;
@@ -27,6 +34,8 @@ class TeamMember {
     role: UserRole.parse(j['role'] as String?),
     active: (j['active'] as bool?) ?? true,
     isSuperAdmin: (j['is_super_admin'] as bool?) ?? false,
+    deputyUntil: DateTime.tryParse((j['deputy_until'] as String?) ?? '')
+        ?.toLocal(),
   );
 }
 
@@ -59,6 +68,12 @@ abstract class TeamRepository {
     required UserRole role,
   });
   Future<void> setActive(String id, bool active);
+
+  /// Désigne (ou, avec null, retire) un suppléant du rédacteur en chef.
+  Future<void> setDeputy(String id, DateTime? until);
+
+  /// Nouveau mot de passe provisoire (affiché une seule fois).
+  Future<CreatedMember> resetPassword(String id);
 }
 
 class SupabaseTeamRepository implements TeamRepository {
@@ -71,7 +86,9 @@ class SupabaseTeamRepository implements TeamRepository {
   Future<List<TeamMember>> fetch() async {
     final rows = await _client
         .from('users')
-        .select('id, full_name, email, role, active, is_super_admin')
+        .select(
+          'id, full_name, email, role, active, is_super_admin, deputy_until',
+        )
         .order('full_name');
     return rows.map(TeamMember.fromJson).toList();
   }
@@ -111,6 +128,28 @@ class SupabaseTeamRepository implements TeamRepository {
       'full_name': fullName.trim(),
       'role': role.name,
     });
+    return CreatedMember(
+      id: d['id'] as String,
+      email: d['email'] as String,
+      tempPassword: d['temp_password'] as String,
+    );
+  }
+
+  @override
+  Future<void> setDeputy(String id, DateTime? until) async {
+    try {
+      await _client.rpc(
+        'set_deputy',
+        params: {'p_user': id, 'p_until': until?.toUtc().toIso8601String()},
+      );
+    } on PostgrestException catch (e) {
+      throw TeamException(e.message);
+    }
+  }
+
+  @override
+  Future<CreatedMember> resetPassword(String id) async {
+    final d = await _invoke({'action': 'reset_password', 'id': id});
     return CreatedMember(
       id: d['id'] as String,
       email: d['email'] as String,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -69,10 +70,57 @@ class ConductorDetailScreen extends ConsumerWidget {
       }
     }
 
+    Future<void> saveTemplate() async {
+      final messenger = ScaffoldMessenger.of(context);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Enregistrer comme modèle ?'),
+          content: const Text(
+            'Les lignes de ce conducteur (hors abandonnées) deviendront les lignes de départ de toutes les prochaines éditions de ce créneau. Le modèle précédent est remplacé.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      try {
+        final n = await repo.saveAsTemplate(conductorId);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Modèle enregistré : $n ligne${n > 1 ? 's' : ''}.'),
+          ),
+        );
+      } catch (_) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Enregistrement impossible.')),
+        );
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(conductor?.title ?? 'Conducteur'),
         actions: [
+          IconButton(
+            tooltip: 'Historique des modifications',
+            icon: const Icon(Icons.history),
+            onPressed: () => showHistorySheet(context, conductorId),
+          ),
+          if (isAdmin && conductor?.slotId != null)
+            IconButton(
+              tooltip: 'Enregistrer comme modèle du créneau',
+              icon: const Icon(Icons.bookmark_add_outlined),
+              onPressed: () => saveTemplate(),
+            ),
           IconButton(
             tooltip: 'Exporter en PDF',
             icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -124,7 +172,10 @@ class ConductorDetailScreen extends ConsumerWidget {
               ),
             ),
           if (lines.value != null && lines.value!.isNotEmpty)
-            _TimingBar(timing: ConductorTiming.compute(lines.value!, sounds)),
+            _TimingBar(
+              timing: ConductorTiming.compute(lines.value!, sounds),
+              target: conductor?.targetDuration,
+            ),
           Expanded(
             child: lines.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -170,8 +221,9 @@ class ConductorDetailScreen extends ConsumerWidget {
 }
 
 class _TimingBar extends StatelessWidget {
-  const _TimingBar({required this.timing});
+  const _TimingBar({required this.timing, this.target});
   final ConductorTiming timing;
+  final int? target;
 
   @override
   Widget build(BuildContext context) {
@@ -199,6 +251,40 @@ class _TimingBar extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (target != null)
+            Text(
+              'Cible ${formatDuration(target!)}',
+              style: text.bodyMedium?.copyWith(fontFamily: 'FiraCode'),
+            ),
+          if (target != null)
+            Builder(
+              builder: (_) {
+                final diff = timing.estimated - target!;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      diff > 0
+                          ? Icons.warning_amber
+                          : Icons.check_circle_outline,
+                      size: 16,
+                      color: diff > 0 ? c.warning : c.success,
+                    ),
+                    const SizedBox(width: Space.xs),
+                    Text(
+                      diff > 0
+                          ? 'Dépassement de ${formatDuration(diff)}'
+                          : diff == 0
+                          ? 'Durée exacte'
+                          : 'Reste ${formatDuration(-diff)}',
+                      style: text.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           Text(
             '${timing.withSound}/${timing.counted} lignes avec son',
             style: text.bodySmall,
@@ -370,6 +456,75 @@ class _LineTile extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Historique des modifications du conducteur (qui a fait quoi, quand).
+Future<void> showHistorySheet(BuildContext context, String conductorId) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: const BoxConstraints(maxWidth: 640),
+    builder: (_) => _HistorySheet(conductorId: conductorId),
+  );
+}
+
+class _HistorySheet extends ConsumerWidget {
+  const _HistorySheet({required this.conductorId});
+  final String conductorId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(historyProvider(conductorId));
+    final names = ref.watch(authorNamesProvider).value ?? const {};
+    final c = context.colors;
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.7,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.sm),
+            child: Text(
+              'Historique des modifications',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          Expanded(
+            child: history.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, _) => const Center(
+                child: Text('Impossible de charger l’historique.'),
+              ),
+              data: (list) => list.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aucune modification enregistrée.',
+                        style: TextStyle(color: c.mutedForeground),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(Space.lg),
+                      itemCount: list.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final e = list[i];
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(e.summary),
+                          subtitle: Text(
+                            '${names[e.userId] ?? 'Système'} · ${DateFormat('dd/MM HH:mm').format(e.createdAt.toLocal())}',
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

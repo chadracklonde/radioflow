@@ -115,6 +115,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ? 'Saisissez votre mot de passe.'
                             : null,
                       ),
+                      const SizedBox(height: Space.sm),
+                      Text(
+                        'Mot de passe oublié ? Demandez-en un nouveau au super administrateur.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       if (_error != null) ...[
                         const SizedBox(height: Space.lg),
                         Semantics(

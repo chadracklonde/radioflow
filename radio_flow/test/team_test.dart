@@ -79,6 +79,32 @@ class FakeTeam implements TeamRepository {
   Future<List<TeamMember>> fetch() async => List.of(members);
 
   @override
+  Future<void> setDeputy(String id, DateTime? until) async {
+    if (failWith != null) throw failWith!;
+    calls.add('deputy:$id:${until == null ? 'none' : 'set'}');
+    members = [
+      for (final m in members)
+        m.id == id
+            ? TeamMember(
+                id: m.id,
+                fullName: m.fullName,
+                email: m.email,
+                role: m.role,
+                active: m.active,
+                deputyUntil: until,
+              )
+            : m,
+    ];
+  }
+
+  @override
+  Future<CreatedMember> resetPassword(String id) async {
+    if (failWith != null) throw failWith!;
+    calls.add('reset:$id');
+    return CreatedMember(id: id, email: 'x', tempPassword: 'Nouveau-Mdp-2468');
+  }
+
+  @override
   Future<void> setRole(String id, UserRole role) async {
     if (failWith != null) throw failWith!;
     calls.add('role:$id:${role.name}');
@@ -274,6 +300,55 @@ void main() {
       expect(find.text('Désactivé'), findsNWidgets(2));
     },
   );
+
+  testWidgets('suppléance : désigner puis mettre fin', (tester) async {
+    final team = await pump(tester);
+    await openTeam(tester);
+    await tester.tap(find.byTooltip('Actions pour Awa Traoré'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Désigner suppléant du rédacteur en chef'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(team.calls, ['deputy:u2:set']);
+    expect(find.textContaining('Suppléant jusqu’au'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Actions pour Awa Traoré'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mettre fin à la suppléance'));
+    await tester.pumpAndSettle();
+    expect(team.calls.last, 'deputy:u2:none');
+    expect(find.textContaining('Suppléant jusqu’au'), findsNothing);
+  });
+
+  testWidgets('pas de suppléance proposée pour un rédacteur en chef', (
+    tester,
+  ) async {
+    await pump(tester);
+    await openTeam(tester);
+    // Chadrack (super administrateur) n'a pas de menu d'actions
+    expect(find.byTooltip('Actions pour Chadrack Tambwe'), findsNothing);
+  });
+
+  testWidgets('réinitialiser le mot de passe : affiché une seule fois', (
+    tester,
+  ) async {
+    final team = await pump(tester);
+    await openTeam(tester);
+    await tester.tap(find.byTooltip('Actions pour Awa Traoré'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Réinitialiser le mot de passe'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Réinitialiser'));
+    await tester.pumpAndSettle();
+    expect(team.calls, ['reset:u2']);
+    expect(find.text('Mot de passe réinitialisé'), findsOneWidget);
+    expect(find.text('Nouveau-Mdp-2468'), findsOneWidget);
+    expect(find.text('awa@rtc.ml'), findsWidgets);
+    await tester.tap(find.text('Terminé'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nouveau-Mdp-2468'), findsNothing);
+  });
 
   testWidgets('réactiver un compte désactivé', (tester) async {
     final team = await pump(tester);

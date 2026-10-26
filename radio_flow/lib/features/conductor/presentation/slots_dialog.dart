@@ -19,6 +19,7 @@ class _SlotsDialog extends ConsumerStatefulWidget {
 
 class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
   final _title = TextEditingController();
+  final _minutes = TextEditingController();
   TimeOfDay _time = const TimeOfDay(hour: 7, minute: 0);
   String? _error;
   final _days = <int>{...BroadcastSlot.allWeekdays};
@@ -26,6 +27,7 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
   @override
   void dispose() {
     _title.dispose();
+    _minutes.dispose();
     super.dispose();
   }
 
@@ -41,6 +43,13 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
       setState(() => _error = 'Choisissez au moins un jour de diffusion.');
       return;
     }
+    final minutesText = _minutes.text.trim();
+    final minutes = minutesText.isEmpty ? null : int.tryParse(minutesText);
+    if (minutesText.isNotEmpty &&
+        (minutes == null || minutes <= 0 || minutes > 600)) {
+      setState(() => _error = 'Durée en minutes, par exemple 30.');
+      return;
+    }
     try {
       await ref
           .read(conductorRepositoryProvider)
@@ -48,8 +57,10 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
             title: _title.text,
             time: _timeText,
             weekdays: (_days.toList()..sort()),
+            durationSeconds: minutes == null ? null : minutes * 60,
           );
       _title.clear();
+      _minutes.clear();
       ref.invalidate(slotsProvider);
       setState(() => _error = null);
     } catch (_) {
@@ -113,7 +124,9 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
                                 ),
                               ),
                               title: Text(s.title),
-                              subtitle: Text(_daysLabel(s.weekdays)),
+                              subtitle: Text(
+                                '${_daysLabel(s.weekdays)}${s.durationSeconds != null ? ' · ${s.durationSeconds! ~/ 60} min' : ''}',
+                              ),
                               trailing: IconButton(
                                 tooltip: 'Supprimer ${s.title}',
                                 icon: const Icon(Icons.delete_outline),
@@ -127,6 +140,15 @@ class _SlotsDialogState extends ConsumerState<_SlotsDialog> {
               TextField(
                 controller: _title,
                 decoration: const InputDecoration(labelText: 'Nom du créneau'),
+                onSubmitted: (_) => _add(),
+              ),
+              const SizedBox(height: Space.md),
+              TextField(
+                controller: _minutes,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Durée de l’émission en minutes (facultatif)',
+                ),
                 onSubmitted: (_) => _add(),
               ),
               const SizedBox(height: Space.md),

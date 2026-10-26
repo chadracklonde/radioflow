@@ -93,8 +93,11 @@ class FakeConductors implements ConductorRepository {
     required String title,
     required String time,
     List<int> weekdays = BroadcastSlot.allWeekdays,
+    int? durationSeconds,
   }) async {
-    calls.add('addSlot:$title:$time:${weekdays.join()}');
+    calls.add(
+      'addSlot:$title:$time:${weekdays.join()}:${durationSeconds ?? '-'}',
+    );
     slots = [
       ...slots,
       BroadcastSlot(
@@ -106,6 +109,38 @@ class FakeConductors implements ConductorRepository {
       ),
     ];
   }
+
+  @override
+  Future<void> setLineScript(String lineId, String? text) async {
+    calls.add('script:$lineId:${text ?? ''}');
+    lines = [
+      for (final l in lines)
+        if (l.id == lineId)
+          ConductorLine(
+            id: l.id,
+            conductorId: l.conductorId,
+            position: l.position,
+            itemType: l.itemType,
+            title: l.title,
+            status: l.status,
+            plannedDuration: l.plannedDuration,
+            script: (text == null || text.isEmpty) ? null : text,
+          )
+        else
+          l,
+    ];
+    _changes.add(null);
+  }
+
+  @override
+  Future<int> saveAsTemplate(String conductorId) async {
+    calls.add('template:$conductorId');
+    return lines.length;
+  }
+
+  List<HistoryEntry> history = const [];
+  @override
+  Future<List<HistoryEntry>> fetchHistory(String conductorId) async => history;
 
   @override
   Future<void> removeSlot(String id) async {
@@ -366,12 +401,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Grille de la station'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'Flash');
+    await tester.enterText(find.byType(TextField).first, 'Flash');
+    await tester.enterText(find.byType(TextField).at(1), '30');
     await tester.tap(find.text('Ven'));
     await tester.pump();
     await tester.tap(find.text('Ajouter'));
     await tester.pumpAndSettle();
-    expect(repo.calls, ['addSlot:Flash:07:00:123467']);
+    expect(repo.calls, ['addSlot:Flash:07:00:123467:1800']);
     expect(find.text('Flash'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Supprimer Flash'));
@@ -491,6 +527,135 @@ void main() {
       expect(find.byTooltip('Descendre'), findsNothing);
     },
   );
+
+  Future<FakeConductors> openLine(
+    WidgetTester tester,
+    UserRole role, {
+    ConductorStatus status = ConductorStatus.open,
+    List<ConductorLine>? lines,
+  }) async {
+    final repo = FakeConductors(
+      conductors: [_conductor(status)],
+      lines: lines ?? _lines,
+    );
+    await pump(tester, role, conductors: repo);
+    await tester.tap(find.text('Journal de 12h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Marché de Bamako'));
+    await tester.pumpAndSettle();
+    return repo;
+  }
+
+  testWidgets('texte à l’antenne : un journaliste l’écrit puis le modifie', (
+    tester,
+  ) async {
+    final repo = await openLine(tester, UserRole.journalist);
+    expect(find.text('Aucun texte pour cette ligne.'), findsOneWidget);
+    await tester.tap(find.text('Écrire'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Bonjour Bamako');
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    expect(repo.calls, ['script:l2:Bonjour Bamako']);
+    expect(
+      tester.widget<SelectableText>(find.byType(SelectableText)).data,
+      'Bonjour Bamako',
+    );
+    expect(find.text('Modifier'), findsOneWidget);
+  });
+
+  testWidgets('texte à l’antenne : lecture seule pour un technicien', (
+    tester,
+  ) async {
+    await openLine(tester, UserRole.technician);
+    expect(find.text('Texte à lire à l’antenne'), findsOneWidget);
+    expect(find.text('Écrire'), findsNothing);
+  });
+
+  testWidgets(
+    'texte à l’antenne : verrouillé pour un journaliste, libre pour l’admin',
+    (tester) async {
+      await openLine(
+        tester,
+        UserRole.journalist,
+        status: ConductorStatus.locked,
+      );
+      expect(find.text('Écrire'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await openLine(tester, UserRole.admin, status: ConductorStatus.locked);
+      expect(find.text('Écrire'), findsOneWidget);
+    },
+  );
+
+  testWidgets('historique des modifications', (tester) async {
+    final repo =
+        FakeConductors(
+            conductors: [_conductor(ConductorStatus.open)],
+            lines: _lines,
+          )
+          ..history = [
+            HistoryEntry(
+              id: 2,
+              summary: 'Texte de « Marché de Bamako » modifié',
+              createdAt: DateTime(2026, 9, 9, 10, 30),
+              userId: 'u1',
+            ),
+          ];
+    await pump(tester, UserRole.journalist, conductors: repo);
+    await tester.tap(find.text('Journal de 12h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Historique des modifications'));
+    await tester.pumpAndSettle();
+    expect(find.text('Texte de « Marché de Bamako » modifié'), findsOneWidget);
+    expect(find.textContaining('Awa Traoré · 09/09 10:30'), findsOneWidget);
+  });
+
+  testWidgets(
+    'modèle : enregistré par l’admin pour un conducteur issu de la grille',
+    (tester) async {
+      final withSlot = Conductor(
+        id: 'c1',
+        title: 'Journal de 12h',
+        broadcastDate: DateTime(_today.year, _today.month, _today.day),
+        status: ConductorStatus.open,
+        broadcastTime: '12:00',
+        slotId: 's1',
+        targetDuration: 120,
+      );
+      final repo = FakeConductors(conductors: [withSlot], lines: _lines);
+      await pump(tester, UserRole.admin, conductors: repo);
+      await tester.tap(find.text('Journal de 12h'));
+      await tester.pumpAndSettle();
+      // durée prévue 2:45 pour une cible de 2:00
+      expect(find.text('Cible 2:00'), findsOneWidget);
+      expect(find.text('Dépassement de 0:45'), findsOneWidget);
+      await tester.tap(find.byTooltip('Enregistrer comme modèle du créneau'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+      expect(repo.calls, ['template:c1']);
+      expect(find.text('Modèle enregistré : 2 lignes.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('modèle : pas de bouton pour un journaliste', (tester) async {
+    final repo = FakeConductors(
+      conductors: [
+        Conductor(
+          id: 'c1',
+          title: 'Journal de 12h',
+          broadcastDate: DateTime(_today.year, _today.month, _today.day),
+          status: ConductorStatus.open,
+          slotId: 's1',
+        ),
+      ],
+      lines: _lines,
+    );
+    await pump(tester, UserRole.journalist, conductors: repo);
+    await tester.tap(find.text('Journal de 12h'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Enregistrer comme modèle du créneau'), findsNothing);
+  });
 
   testWidgets('fil de discussion : messages texte et audio, envoi', (
     tester,

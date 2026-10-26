@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -155,6 +156,75 @@ class _MemberTile extends ConsumerWidget {
     }
   }
 
+  Future<void> _pickDeputy(BuildContext context, WidgetRef ref) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      helpText: 'Suppléance de ${member.fullName} jusqu’au…',
+      initialDate: now.add(const Duration(days: 7)),
+      firstDate: now.add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 89)),
+    );
+    if (picked == null || !context.mounted) return;
+    // jusqu'à la fin de la journée choisie
+    final until = DateTime(picked.year, picked.month, picked.day, 23, 59);
+    await _run(
+      context,
+      ref,
+      () => ref.read(teamRepositoryProvider).setDeputy(member.id, until),
+    );
+  }
+
+  Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Réinitialiser le mot de passe de ${member.fullName} ?'),
+        content: const Text(
+          'Un nouveau mot de passe provisoire sera créé et l’ancien cessera de fonctionner. Transmettez-le au membre de manière privée.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Réinitialiser'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final created = await ref
+          .read(teamRepositoryProvider)
+          .resetPassword(member.id);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _CredentialsDialog(
+          created: CreatedMember(
+            id: created.id,
+            email: member.email,
+            tempPassword: created.tempPassword,
+          ),
+          title: 'Mot de passe réinitialisé',
+        ),
+      );
+    } on TeamException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Réinitialisation impossible. Réessayez.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
@@ -208,6 +278,13 @@ class _MemberTile extends ConsumerWidget {
                             : member.role.label,
                         color: c.mutedForeground,
                       ),
+                      if (member.isDeputy)
+                        IconLabel(
+                          icon: Icons.swap_horiz,
+                          label:
+                              'Suppléant jusqu’au ${DateFormat('dd/MM/yyyy').format(member.deputyUntil!)}',
+                          color: c.warning,
+                        ),
                       if (dim)
                         IconLabel(
                           icon: Icons.block,
@@ -226,6 +303,18 @@ class _MemberTile extends ConsumerWidget {
                 onSelected: (v) async {
                   if (v == 'toggle') {
                     await _confirmToggle(context, ref);
+                  } else if (v == 'deputy') {
+                    await _pickDeputy(context, ref);
+                  } else if (v == 'deputy_clear') {
+                    await _run(
+                      context,
+                      ref,
+                      () => ref
+                          .read(teamRepositoryProvider)
+                          .setDeputy(member.id, null),
+                    );
+                  } else if (v == 'reset') {
+                    await _confirmReset(context, ref);
                   } else {
                     final role = UserRole.values.byName(v);
                     await _run(
@@ -243,6 +332,29 @@ class _MemberTile extends ConsumerWidget {
                       value: r.name,
                       checked: r == member.role,
                       child: Text(r.label),
+                    ),
+                  if (!isMe &&
+                      member.active &&
+                      member.role != UserRole.admin) ...[
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'deputy',
+                      child: Text(
+                        member.isDeputy
+                            ? 'Modifier la suppléance'
+                            : 'Désigner suppléant du rédacteur en chef',
+                      ),
+                    ),
+                    if (member.isDeputy)
+                      const PopupMenuItem(
+                        value: 'deputy_clear',
+                        child: Text('Mettre fin à la suppléance'),
+                      ),
+                  ],
+                  if (!isMe)
+                    const PopupMenuItem(
+                      value: 'reset',
+                      child: Text('Réinitialiser le mot de passe'),
                     ),
                   if (!isMe) ...[
                     const PopupMenuDivider(),
@@ -417,8 +529,9 @@ class _AddMemberFormState extends ConsumerState<_AddMemberForm> {
 }
 
 class _CredentialsDialog extends StatefulWidget {
-  const _CredentialsDialog({required this.created});
+  const _CredentialsDialog({required this.created, this.title = 'Compte créé'});
   final CreatedMember created;
+  final String title;
 
   @override
   State<_CredentialsDialog> createState() => _CredentialsDialogState();
@@ -435,7 +548,7 @@ class _CredentialsDialogState extends State<_CredentialsDialog> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return AlertDialog(
-      title: const Text('Compte créé'),
+      title: Text(widget.title),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

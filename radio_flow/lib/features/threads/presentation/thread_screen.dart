@@ -159,7 +159,7 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
               .firstOrNull;
     final canUpload =
         profile != null &&
-        profile.canPropose &&
+        profile.canSendAudio &&
         conductor != null &&
         line != null &&
         (profile.isAdmin || !conductor.status.isLocked);
@@ -182,6 +182,15 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
             children: [
               if (isProposal)
                 _ProposalHint(placed: proposal?.conductorLineId != null),
+              if (line != null)
+                _ScriptCard(
+                  line: line,
+                  canEdit:
+                      profile != null &&
+                      profile.canWriteScript &&
+                      conductor != null &&
+                      (profile.isAdmin || !conductor.status.isLocked),
+                ),
               Expanded(
                 child: messages.when(
                   loading: () =>
@@ -377,6 +386,141 @@ class _ProposalHint extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Texte à lire à l'antenne pour la ligne : lisible par tous, modifiable par
+/// les journalistes et le rédacteur en chef (jusqu'au verrouillage pour les journalistes).
+class _ScriptCard extends ConsumerWidget {
+  const _ScriptCard({required this.line, required this.canEdit});
+  final ConductorLine line;
+  final bool canEdit;
+
+  Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => _ScriptDialog(initial: line.script ?? ''),
+    );
+    if (saved == null) return;
+    try {
+      await ref
+          .read(conductorRepositoryProvider)
+          .setLineScript(line.id, saved.trim());
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Texte enregistré.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enregistrement impossible (droits, conducteur verrouillé ou réseau).',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+    final script = line.script;
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxHeight: 220),
+      margin: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 0),
+      padding: const EdgeInsets.all(Space.md),
+      decoration: BoxDecoration(
+        color: c.muted,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.mic_none, size: 18, color: c.mutedForeground),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: Text('Texte à lire à l’antenne', style: text.titleSmall),
+              ),
+              if (canEdit)
+                TextButton.icon(
+                  onPressed: () => _edit(context, ref),
+                  icon: Icon(
+                    script == null ? Icons.edit_note : Icons.edit_outlined,
+                    size: 18,
+                  ),
+                  label: Text(script == null ? 'Écrire' : 'Modifier'),
+                ),
+            ],
+          ),
+          const SizedBox(height: Space.xs),
+          Flexible(
+            child: SingleChildScrollView(
+              child: script == null
+                  ? Text(
+                      'Aucun texte pour cette ligne.',
+                      style: text.bodyMedium?.copyWith(
+                        color: c.mutedForeground,
+                      ),
+                    )
+                  : SelectableText(script, style: text.bodyMedium),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScriptDialog extends StatefulWidget {
+  const _ScriptDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_ScriptDialog> createState() => _ScriptDialogState();
+}
+
+class _ScriptDialogState extends State<_ScriptDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Texte à lire à l’antenne'),
+      content: SizedBox(
+        width: 480,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          minLines: 6,
+          maxLines: 14,
+          maxLength: 20000,
+          decoration: const InputDecoration(
+            hintText: 'Lancement, brève, texte du présentateur…',
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Enregistrer'),
+        ),
+      ],
     );
   }
 }

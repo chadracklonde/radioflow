@@ -17,8 +17,18 @@ abstract class ConductorRepository {
     required String title,
     required String time,
     List<int> weekdays = BroadcastSlot.allWeekdays,
+    int? durationSeconds,
   });
   Future<void> removeSlot(String id);
+
+  /// Texte à lire à l'antenne (null ou vide pour l'effacer).
+  Future<void> setLineScript(String lineId, String? text);
+
+  /// Enregistre les lignes du conducteur comme modèle de son créneau; renvoie leur nombre.
+  Future<int> saveAsTemplate(String conductorId);
+
+  /// Modifications du conducteur, les plus récentes d'abord.
+  Future<List<HistoryEntry>> fetchHistory(String conductorId);
 
   /// Ajoute une ligne en fin de conducteur et renvoie son identifiant.
   Future<String> addLine({
@@ -82,12 +92,42 @@ class SupabaseConductorRepository implements ConductorRepository {
     required String title,
     required String time,
     List<int> weekdays = BroadcastSlot.allWeekdays,
+    int? durationSeconds,
   }) async {
     await _client.from('broadcast_slots').insert({
       'title': title.trim(),
       'broadcast_time': time,
       'weekdays': weekdays,
+      'duration_seconds': durationSeconds,
     });
+  }
+
+  @override
+  Future<void> setLineScript(String lineId, String? text) async {
+    await _client.rpc(
+      'set_line_script',
+      params: {'p_line_id': lineId, 'p_script': text ?? ''},
+    );
+  }
+
+  @override
+  Future<int> saveAsTemplate(String conductorId) async {
+    final n = await _client.rpc(
+      'save_conductor_as_template',
+      params: {'p_conductor_id': conductorId},
+    );
+    return (n as num).toInt();
+  }
+
+  @override
+  Future<List<HistoryEntry>> fetchHistory(String conductorId) async {
+    final rows = await _client
+        .from('conductor_history')
+        .select()
+        .eq('conductor_id', conductorId)
+        .order('created_at', ascending: false)
+        .limit(200);
+    return rows.map(HistoryEntry.fromJson).toList();
   }
 
   @override
@@ -164,6 +204,12 @@ final linesProvider = StreamProvider.autoDispose
     .family<List<ConductorLine>, String>(
       (ref, conductorId) =>
           ref.watch(conductorRepositoryProvider).watchLines(conductorId),
+    );
+
+final historyProvider = FutureProvider.autoDispose
+    .family<List<HistoryEntry>, String>(
+      (ref, conductorId) =>
+          ref.watch(conductorRepositoryProvider).fetchHistory(conductorId),
     );
 
 final slotsProvider = FutureProvider.autoDispose<List<BroadcastSlot>>(

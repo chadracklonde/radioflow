@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/responsive/breakpoints.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../widgets/sync_banner.dart';
 import '../widgets/brand_mark.dart';
 import 'destinations.dart';
@@ -50,7 +51,10 @@ class AppShell extends ConsumerWidget {
                       alignment: Alignment.bottomCenter,
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 16),
-                        child: account,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [const NotificationsBell(), account],
+                        ),
                       ),
                     ),
                   ),
@@ -77,7 +81,10 @@ class AppShell extends ConsumerWidget {
           );
         }
         return Scaffold(
-          appBar: AppBar(title: Text(current.label), actions: [account]),
+          appBar: AppBar(
+            title: Text(current.label),
+            actions: [const NotificationsBell(), account],
+          ),
           body: Column(
             children: [
               const SyncBanner(),

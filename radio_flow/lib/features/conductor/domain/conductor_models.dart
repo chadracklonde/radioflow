@@ -69,7 +69,15 @@ class Conductor {
     required this.broadcastDate,
     required this.status,
     this.broadcastTime,
+    this.targetDuration,
+    this.slotId,
   });
+
+  /// Durée cible de l'émission en secondes (reprise du créneau de la grille).
+  final int? targetDuration;
+
+  /// Créneau de la grille dont le conducteur est issu (modèle de lignes).
+  final String? slotId;
 
   final String id;
   final String title;
@@ -85,6 +93,8 @@ class Conductor {
     broadcastDate: DateTime.parse(j['broadcast_date'] as String),
     status: ConductorStatus.parse(j['status'] as String),
     broadcastTime: (j['broadcast_time'] as String?)?.substring(0, 5),
+    targetDuration: j['target_duration'] as int?,
+    slotId: j['slot_id'] as String?,
   );
 }
 
@@ -97,7 +107,11 @@ class ConductorLine {
     required this.title,
     required this.status,
     this.plannedDuration,
+    this.script,
   });
+
+  /// Texte à lire à l'antenne.
+  final String? script;
 
   final String id;
   final String conductorId;
@@ -117,6 +131,7 @@ class ConductorLine {
     title: j['title'] as String,
     status: LineStatus.parse(j['status'] as String),
     plannedDuration: j['planned_duration'] as int?,
+    script: j['script'] as String?,
   );
 }
 
@@ -127,7 +142,12 @@ class BroadcastSlot {
     required this.time,
     required this.active,
     this.weekdays = allWeekdays,
+    this.durationSeconds,
   });
+
+  /// Durée de l'émission en secondes, si connue.
+  final int? durationSeconds;
+
   final String id;
   final String title;
   final String time; // HH:mm
@@ -149,6 +169,28 @@ class BroadcastSlot {
       for (final d in (j['weekdays'] as List?) ?? allWeekdays)
         (d as num).toInt(),
     ],
+    durationSeconds: j['duration_seconds'] as int?,
+  );
+}
+
+/// Une ligne de l'historique des modifications d'un conducteur.
+class HistoryEntry {
+  const HistoryEntry({
+    required this.id,
+    required this.summary,
+    required this.createdAt,
+    this.userId,
+  });
+  final int id;
+  final String summary;
+  final DateTime createdAt;
+  final String? userId;
+
+  factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
+    id: j['id'] as int,
+    summary: j['summary'] as String,
+    createdAt: DateTime.parse(j['created_at'] as String),
+    userId: j['user_id'] as String?,
   );
 }
 
