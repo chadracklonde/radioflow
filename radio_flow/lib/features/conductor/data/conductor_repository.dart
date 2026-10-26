@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/utils/audio_naming.dart';
 import '../domain/conductor_models.dart';
 
 String isoDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
@@ -157,6 +158,61 @@ class SupabaseConductorRepository implements ConductorRepository {
   @override
   Future<void> swapLines(String a, String b) async {
     await _client.rpc('swap_conductor_lines', params: {'p_a': a, 'p_b': b});
+    // Les noms de fichiers portent la position : on les met à jour. Si cela échoue,
+    // l'échange reste valable (les anciens noms restent lisibles et téléchargeables).
+    try {
+      await _renameSounds([a, b]);
+    } catch (_) {}
+  }
+
+  Future<void> _renameSounds(List<String> lineIds) async {
+    final rows = await _client
+        .from('sound_files')
+        .select()
+        .inFilter('line_id', lineIds);
+    final plan = planSoundRenames([
+      for (final r in rows)
+        (
+          messageId: r['message_id'] as String,
+          conductorId: r['conductor_id'] as String,
+          path: r['storage_path'] as String,
+          originalName: r['original_name'] as String?,
+          position: r['position_index'] as int,
+          date: DateTime.tryParse((r['broadcast_date'] as String?) ?? ''),
+        ),
+    ]);
+    if (plan.isEmpty) return;
+    final bucket = _client.storage.from('conductor-audio');
+    // Deux étapes (nom provisoire) : deux fichiers peuvent échanger leurs noms sans collision.
+    // En cas d'échec, les fichiers déjà déplacés reprennent leur nom d'origine.
+    String tmp(SoundRename p) => '${p.conductorId}/.tmp-${p.messageId}';
+    final parked = <SoundRename>[];
+    try {
+      for (final p in plan) {
+        await bucket.move(p.from, tmp(p));
+        parked.add(p);
+      }
+      for (final p in List.of(parked)) {
+        await bucket.move(tmp(p), p.to);
+        parked.remove(p);
+        try {
+          await _client
+              .from('messages')
+              .update({'audio_file_url': p.to})
+              .eq('id', p.messageId);
+        } catch (_) {
+          await bucket.move(p.to, p.from);
+          rethrow;
+        }
+      }
+    } catch (_) {
+      for (final p in parked) {
+        try {
+          await bucket.move(tmp(p), p.from);
+        } catch (_) {}
+      }
+      rethrow;
+    }
   }
 
   @override

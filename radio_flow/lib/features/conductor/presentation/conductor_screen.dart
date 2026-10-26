@@ -27,22 +27,37 @@ class ConductorScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          DateBar(
-            date: date,
-            trailing: [
-              if (isAdmin)
-                IconButton(
-                  tooltip: 'Générer les conducteurs manquants',
-                  icon: const Icon(Icons.auto_awesome),
-                  onPressed: () => generateForDate(context, ref, date),
-                ),
-              if (isAdmin)
-                IconButton(
-                  tooltip: 'Grille de la station',
-                  icon: const Icon(Icons.calendar_view_week),
-                  onPressed: () => showSlotsDialog(context),
-                ),
-            ],
+          DateBar(date: date),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: Space.xs,
+                children: [
+                  _BarAction(
+                    tooltip: 'Archives',
+                    label: 'Archives',
+                    icon: Icons.inventory_2_outlined,
+                    onPressed: () => context.push('/archives'),
+                  ),
+                  if (isAdmin)
+                    _BarAction(
+                      tooltip: 'Générer les conducteurs manquants',
+                      label: 'Générer',
+                      icon: Icons.auto_awesome,
+                      onPressed: () => generateForDate(context, ref, date),
+                    ),
+                  if (isAdmin)
+                    _BarAction(
+                      tooltip: 'Grille de la station',
+                      label: 'Grille',
+                      icon: Icons.calendar_view_week,
+                      onPressed: () => showSlotsDialog(context),
+                    ),
+                ],
+              ),
+            ),
           ),
           Expanded(
             child: conductors.when(
@@ -77,6 +92,29 @@ class ConductorScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _BarAction extends StatelessWidget {
+  const _BarAction({
+    required this.tooltip,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+  final String tooltip;
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: TextButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      label: Text(label),
+    ),
+  );
 }
 
 /// Crée les conducteurs manquants du jour d'après la grille et dit clairement ce qui s'est passé.

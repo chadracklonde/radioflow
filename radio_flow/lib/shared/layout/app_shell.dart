@@ -28,6 +28,12 @@ class AppShell extends ConsumerWidget {
       onPressed: () => context.push('/account'),
     );
 
+    final search = IconButton(
+      tooltip: 'Rechercher',
+      icon: const Icon(Icons.search),
+      onPressed: () => context.push('/search'),
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= Breakpoints.desktop;
@@ -53,7 +59,11 @@ class AppShell extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          children: [const NotificationsBell(), account],
+                          children: [
+                            search,
+                            const NotificationsBell(),
+                            account,
+                          ],
                         ),
                       ),
                     ),
@@ -83,7 +93,7 @@ class AppShell extends ConsumerWidget {
         return Scaffold(
           appBar: AppBar(
             title: Text(current.label),
-            actions: [const NotificationsBell(), account],
+            actions: [search, const NotificationsBell(), account],
           ),
           body: Column(
             children: [

@@ -45,6 +45,54 @@ String _stripAccents(String s) {
   return b.toString();
 }
 
+/// Un fichier à renommer parce que la position de sa ligne a changé.
+class SoundRename {
+  const SoundRename({
+    required this.messageId,
+    required this.conductorId,
+    required this.from,
+    required this.to,
+  });
+  final String messageId;
+  final String conductorId;
+  final String from;
+  final String to;
+}
+
+/// Renommages à faire pour que chaque nom reflète la position actuelle de sa ligne.
+/// [files] : (id du message, id du conducteur, chemin actuel, nom d'origine, position, date).
+List<SoundRename> planSoundRenames(
+  Iterable<
+    ({
+      String messageId,
+      String conductorId,
+      String path,
+      String? originalName,
+      int position,
+      DateTime? date,
+    })
+  >
+  files,
+) {
+  final out = <SoundRename>[];
+  for (final f in files) {
+    if (f.originalName == null || f.date == null) continue;
+    final to =
+        '${f.conductorId}/${audioStoredName(position: f.position, originalName: f.originalName!, date: f.date!)}';
+    if (to != f.path) {
+      out.add(
+        SoundRename(
+          messageId: f.messageId,
+          conductorId: f.conductorId,
+          from: f.path,
+          to: to,
+        ),
+      );
+    }
+  }
+  return out;
+}
+
 abstract final class AudioRules {
   static const extensions = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'wma'];
 

@@ -9,7 +9,9 @@ import '../../features/conductor/data/conductor_repository.dart';
 import '../../features/conductor/presentation/conductor_detail_screen.dart';
 import '../../features/conductor/presentation/conductor_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/archives/presentation/archives_screen.dart';
 import '../../features/forum/presentation/forum_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/tasks/presentation/tasks_screen.dart';
 import '../../features/team/presentation/team_screen.dart';
@@ -54,6 +56,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/team',
         builder: (_, _) => const TeamScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/search',
+        builder: (_, _) => const SearchScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/archives',
+        builder: (_, _) => const ArchivesScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

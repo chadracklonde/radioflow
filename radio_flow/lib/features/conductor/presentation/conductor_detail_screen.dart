@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../auth/data/profile_repository.dart';
 import '../../../core/utils/file_saver.dart';
 import '../../sound_space/data/sound_repository.dart';
+import '../../sound_space/data/sounds_zip.dart';
 import '../data/conductor_export.dart';
 import '../data/conductor_repository.dart';
 import '../domain/conductor_models.dart';
@@ -106,6 +107,48 @@ class ConductorDetailScreen extends ConsumerWidget {
       }
     }
 
+    final conductorSounds =
+        (ref.watch(soundFilesProvider(date)).value ?? const [])
+            .where((f) => f.conductorId == conductorId)
+            .toList();
+
+    Future<void> downloadAll() async {
+      final messenger = ScaffoldMessenger.of(context);
+      final soundRepo = ref.read(soundRepositoryProvider);
+      final saver = ref.read(fileSaverProvider);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Préparation de l’archive (${conductorSounds.length} son${conductorSounds.length > 1 ? 's' : ''})…',
+          ),
+        ),
+      );
+      try {
+        final bytes = await zipSounds(soundRepo, conductorSounds);
+        final name = conductorExportName(conductor!)
+            .replaceFirst('Conducteur', 'Sons')
+            .replaceFirst('.pdf', '.zip');
+        final saved = await saver.save(
+          fileName: name,
+          bytes: bytes,
+          mimeType: 'application/zip',
+        );
+        messenger.hideCurrentSnackBar();
+        if (saved) {
+          messenger.showSnackBar(SnackBar(content: Text('$name enregistré.')));
+        }
+      } catch (_) {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Archive impossible. Vérifiez le réseau et réessayez.',
+            ),
+          ),
+        );
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(conductor?.title ?? 'Conducteur'),
@@ -120,6 +163,12 @@ class ConductorDetailScreen extends ConsumerWidget {
               tooltip: 'Enregistrer comme modèle du créneau',
               icon: const Icon(Icons.bookmark_add_outlined),
               onPressed: () => saveTemplate(),
+            ),
+          if (conductor != null && conductorSounds.isNotEmpty)
+            IconButton(
+              tooltip: 'Télécharger tous les sons (zip)',
+              icon: const Icon(Icons.folder_zip_outlined),
+              onPressed: downloadAll,
             ),
           IconButton(
             tooltip: 'Exporter en PDF',
