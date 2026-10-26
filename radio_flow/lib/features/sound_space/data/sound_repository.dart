@@ -6,13 +6,20 @@ import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/utils/audio_naming.dart';
+import '../../../data/local/local_store.dart';
+import '../../../data/sync/sync_providers.dart';
 import '../domain/sound_file.dart';
+import 'offline_sound_repository.dart';
+import 'pending_audio_store.dart';
 import 'audio_services.dart';
 
 /// Un fichier de ce nom existe déjà dans l'édition.
 class DuplicateAudioException implements Exception {
   const DuplicateAudioException(this.name);
   final String name;
+
+  @override
+  String toString() => 'Un fichier $name existe déjà dans cette édition.';
 }
 
 abstract class SoundRepository {
@@ -147,8 +154,17 @@ class SupabaseSoundRepository implements SoundRepository {
       _client.storage.from(_bucket).download(path);
 }
 
-final soundRepositoryProvider = Provider<SoundRepository>(
+final soundRemoteProvider = Provider<SoundRepository>(
   (ref) => SupabaseSoundRepository(Supabase.instance.client),
+);
+
+final soundRepositoryProvider = Provider<SoundRepository>(
+  (ref) => OfflineSoundRepository(
+    remote: ref.watch(soundRemoteProvider),
+    store: ref.watch(localStoreProvider),
+    sync: ref.watch(syncServiceProvider),
+    files: ref.watch(pendingAudioStoreProvider),
+  ),
 );
 
 final soundFilesProvider = FutureProvider.autoDispose

@@ -150,6 +150,7 @@ class FakeConductors implements ConductorRepository {
 
   @override
   Future<String> addLine({
+    String? id,
     required String conductorId,
     required String title,
     required LineItemType type,

@@ -93,6 +93,7 @@ class _Conductors implements ConductorRepository {
   Future<List<HistoryEntry>> fetchHistory(String conductorId) async => const [];
   @override
   Future<String> addLine({
+    String? id,
     required String conductorId,
     required String title,
     required LineItemType type,

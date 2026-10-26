@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 enum ConductorStatus {
   draft('Brouillon', Icons.edit_outlined),
@@ -96,6 +97,16 @@ class Conductor {
     targetDuration: j['target_duration'] as int?,
     slotId: j['slot_id'] as String?,
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'broadcast_date': DateFormat('yyyy-MM-dd').format(broadcastDate),
+    'status': status.name,
+    'broadcast_time': broadcastTime == null ? null : '$broadcastTime:00',
+    'target_duration': targetDuration,
+    'slot_id': slotId,
+  };
 }
 
 class ConductorLine {
@@ -108,7 +119,39 @@ class ConductorLine {
     required this.status,
     this.plannedDuration,
     this.script,
+    this.pendingSync = false,
   });
+
+  /// Modification rédigée hors ligne, pas encore envoyée.
+  final bool pendingSync;
+
+  ConductorLine copyWith({
+    LineStatus? status,
+    String? script,
+    bool clearScript = false,
+    bool? pendingSync,
+  }) => ConductorLine(
+    id: id,
+    conductorId: conductorId,
+    position: position,
+    itemType: itemType,
+    title: title,
+    status: status ?? this.status,
+    plannedDuration: plannedDuration,
+    script: clearScript ? null : (script ?? this.script),
+    pendingSync: pendingSync ?? this.pendingSync,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'conductor_id': conductorId,
+    'position_index': position,
+    'item_type': itemType.name,
+    'title': title,
+    'status': status.dbValue,
+    'planned_duration': plannedDuration,
+    'script': script,
+  };
 
   /// Texte à lire à l'antenne.
   final String? script;
@@ -157,6 +200,15 @@ class BroadcastSlot {
   final List<int> weekdays;
 
   static const allWeekdays = [1, 2, 3, 4, 5, 6, 7];
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'broadcast_time': '$time:00',
+    'active': active,
+    'weekdays': weekdays,
+    'duration_seconds': durationSeconds,
+  };
 
   bool airsOn(DateTime date) => active && weekdays.contains(date.weekday);
 

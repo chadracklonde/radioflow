@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/utils/audio_naming.dart';
+import '../../../data/local/local_store.dart';
+import '../../../data/sync/sync_providers.dart';
+import 'offline_conductor_repository.dart';
 import '../domain/conductor_models.dart';
 
 String isoDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
@@ -33,6 +36,7 @@ abstract class ConductorRepository {
 
   /// Ajoute une ligne en fin de conducteur et renvoie son identifiant.
   Future<String> addLine({
+    String? id,
     required String conductorId,
     required String title,
     required LineItemType type,
@@ -138,21 +142,23 @@ class SupabaseConductorRepository implements ConductorRepository {
 
   @override
   Future<String> addLine({
+    String? id,
     required String conductorId,
     required String title,
     required LineItemType type,
     int? plannedDuration,
   }) async {
-    final id = await _client.rpc(
+    final created = await _client.rpc(
       'add_conductor_line',
       params: {
         'p_conductor_id': conductorId,
         'p_title': title.trim(),
         'p_item_type': type.name,
         'p_planned_duration': plannedDuration,
+        'p_id': ?id,
       },
     );
-    return id as String;
+    return created as String;
   }
 
   @override
@@ -232,8 +238,16 @@ class SupabaseConductorRepository implements ConductorRepository {
   }
 }
 
-final conductorRepositoryProvider = Provider<ConductorRepository>(
+final conductorRemoteProvider = Provider<ConductorRepository>(
   (ref) => SupabaseConductorRepository(Supabase.instance.client),
+);
+
+final conductorRepositoryProvider = Provider<ConductorRepository>(
+  (ref) => OfflineConductorRepository(
+    remote: ref.watch(conductorRemoteProvider),
+    store: ref.watch(localStoreProvider),
+    sync: ref.watch(syncServiceProvider),
+  ),
 );
 
 class SelectedDate extends Notifier<DateTime> {

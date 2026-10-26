@@ -40,6 +40,25 @@ class SoundFile {
   /// Nom renommé automatiquement (dernier segment du chemin).
   String get storedName => storagePath.split('/').last;
 
+  Map<String, dynamic> toJson() => {
+    'message_id': messageId,
+    'conductor_id': conductorId,
+    'conductor_title': conductorTitle,
+    'broadcast_time': broadcastTime == null ? null : '$broadcastTime:00',
+    'line_id': lineId,
+    'position_index': position,
+    'line_title': lineTitle,
+    'storage_path': storagePath,
+    'uploaded_by': uploadedBy,
+    'uploaded_at': uploadedAt.toUtc().toIso8601String(),
+    'original_name': originalName,
+    'audio_duration': duration,
+    'conductor_status': conductorLocked ? 'locked' : 'open',
+    'broadcast_date': broadcastDate == null
+        ? null
+        : '${broadcastDate!.year.toString().padLeft(4, '0')}-${broadcastDate!.month.toString().padLeft(2, '0')}-${broadcastDate!.day.toString().padLeft(2, '0')}',
+  };
+
   factory SoundFile.fromJson(Map<String, dynamic> j) => SoundFile(
     messageId: j['message_id'] as String,
     conductorId: j['conductor_id'] as String,

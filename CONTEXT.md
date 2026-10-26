@@ -77,7 +77,17 @@ Migrations (à appliquer dans l'ordre) :
 - **Compte administrateur** : `chadracktambwe@gmail.com` (rôle `admin`), créé avec un mot de passe provisoire communiqué dans la conversation : à changer depuis « Mon compte ». Les autres membres se créent dans l'application (Mon compte > Gérer l'équipe > Ajouter un membre) : le mot de passe provisoire est affiché une seule fois pour être transmis au membre. Un compte désactivé ne peut plus se connecter (la session déjà ouverte peut rester valable jusqu'à une heure).
 - Compte de test `test.equipe@example.com` créé et désactivé pendant les essais de la fonction serveur : à supprimer (Authentication > Users).
 - **Mode hors ligne** : voir `docs/ARCHITECTURE.md` (file d'envoi SQLite, périmètre et limites).
-- Le **rôle technicien** n'a pas le droit d'uploader de l'audio (lecture seule des fichiers).
+- Le **rôle technicien** peut écouter, télécharger et **envoyer** des sons (jingles, habillages), avec la même règle de verrouillage que les journalistes; il ne propose pas de sujets et n'écrit pas les textes à l'antenne.
+- **Suppléance** : le super administrateur peut désigner un membre suppléant du rédacteur en chef pour 90 jours au plus (`users.deputy_until`, fonction `set_deputy`). Pendant ce temps `app_role()` renvoie `admin`; la gestion de l'équipe reste réservée au super administrateur.
+
+## Améliorations du quotidien (migrations 1000 et 1100)
+
+- **Notifications** dans l'application (cloche, temps réel) : sujet proposé (aux rédacteurs en chef), sujet validé / refusé (à l'auteur), son reçu (aux rédacteurs en chef). Table `device_tokens` prête pour les notifications push (FCM / APNs), non branchée : elle demande un projet Firebase.
+- **Texte à lire à l'antenne** par ligne (`conductor_lines.script`, fonction `set_line_script`), **durée cible** par créneau, **modèles de conducteur** (`slot_template_lines`, `save_conductor_as_template`), **historique** des modifications (`conductor_history`, alimenté par des déclencheurs, jamais modifiable à la main).
+- **Sons** : durée lue à l'envoi, suppression (même règle de verrouillage que l'envoi, côté base aussi), renommage automatique quand les lignes sont réordonnées (déplacement des fichiers par le rédacteur en chef), archive zip d'un conducteur.
+- **Recherche** (sujets, lignes et textes, discussions, sons) et **archives** (conducteurs passés, suppression des vieux sons des éditions diffusées par le rédacteur en chef).
+- **Équipe** : réinitialisation du mot de passe par le super administrateur (fonction serveur `manage-team`, action `reset_password`), suppléance.
+- **Hors ligne** : en plus de ce qui existait, ajout de ligne, statut de ligne, texte à l'antenne et envoi de sons (fichier gardé sur l'appareil) sont mis en file; la liste des conducteurs, des lignes, des sons et la grille se lisent sans réseau. Restent en ligne : génération, grille, réordonnancement, statut du conducteur, modèles, suppression de sons.
 
 ## Identité visuelle
 

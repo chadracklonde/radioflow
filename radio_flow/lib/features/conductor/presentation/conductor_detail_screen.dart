@@ -443,6 +443,19 @@ class _LineTile extends ConsumerWidget {
                               fontFamily: 'FiraCode',
                             ),
                           ),
+                        if (line.pendingSync)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.cloud_upload_outlined,
+                                size: 14,
+                                color: c.warning,
+                              ),
+                              const SizedBox(width: Space.xs),
+                              Text('En attente d’envoi', style: text.bodySmall),
+                            ],
+                          ),
                         if (soundSeconds != null)
                           Row(
                             mainAxisSize: MainAxisSize.min,

@@ -10,6 +10,7 @@ import '../../conductor/domain/conductor_models.dart';
 import '../../sound_space/data/audio_services.dart';
 import '../../sound_space/data/sound_repository.dart';
 import '../../../core/utils/audio_naming.dart';
+import '../../../data/local/local_store.dart';
 import '../../../shared/widgets/sync_banner.dart';
 import '../../forum/data/forum_repository.dart';
 import '../data/thread_repository.dart';
@@ -103,8 +104,15 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
             bytes: bytes,
             durationSeconds: seconds,
           );
+      final queued = await ref.read(localStoreProvider).hasPending();
       messenger.showSnackBar(
-        SnackBar(content: Text('Envoyé sous le nom $stored')),
+        SnackBar(
+          content: Text(
+            queued
+                ? '$stored : enregistré sur l’appareil, il sera envoyé au retour du réseau.'
+                : 'Envoyé sous le nom $stored',
+          ),
+        ),
       );
     } on DuplicateAudioException catch (e) {
       messenger.showSnackBar(

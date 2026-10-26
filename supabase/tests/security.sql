@@ -343,6 +343,17 @@ select set_config('app.uid', '00000000-0000-0000-0000-00000000000e', false);
 select t.touches_nothing($$delete from public.device_tokens$$, 'les jetons d''un autre ne sont pas visibles');
 reset role;
 
+-- Ajout de ligne rejouable
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+set role authenticated;
+select public.add_conductor_line(:'mid', 'Ligne rejouée', 'brief', 30, 'eeeeeeee-0000-0000-0000-000000000001') as rid1 \gset
+select public.add_conductor_line(:'mid', 'Ligne rejouée', 'brief', 30, 'eeeeeeee-0000-0000-0000-000000000001') as rid2 \gset
+select t.eq(:'rid1', :'rid2', 'rejouer l''ajout renvoie la même ligne');
+select t.eq((select count(*)::text from public.conductor_lines where title = 'Ligne rejouée'), '1', 'aucun doublon après rejeu');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.refused(format($$select public.add_conductor_line(%L, 'Intrus', 'brief', 30, gen_random_uuid())$$, :'mid'), 'un journaliste n''ajoute pas de ligne');
+reset role;
+
 -- ======================= Visiteur non connecté =======================
 reset role;
 set role anon;
