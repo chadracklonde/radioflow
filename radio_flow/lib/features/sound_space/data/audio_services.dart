@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -92,3 +95,39 @@ final audioPlayerProvider = Provider<AudioPlayerService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// Lit la durée d'un fichier audio avant l'envoi (isolé pour les tests).
+abstract class AudioDurationService {
+  /// Durée en secondes, ou null si elle ne peut pas être lue (l'envoi continue sans).
+  Future<int?> probe(String name, Uint8List bytes);
+}
+
+class JustAudioDurationService implements AudioDurationService {
+  @override
+  Future<int?> probe(String name, Uint8List bytes) async {
+    if (kIsWeb) return null;
+    final dir = await Directory.systemTemp.createTemp('radioflow_probe');
+    final player = AudioPlayer();
+    try {
+      final file = File('${dir.path}/${name.split(RegExp(r'[\\/]')).last}');
+      await file.writeAsBytes(bytes, flush: true);
+      final d = await player
+          .setFilePath(file.path)
+          .timeout(const Duration(seconds: 10));
+      if (d == null) return null;
+      final seconds = (d.inMilliseconds / 1000).round();
+      return seconds > 0 ? seconds : null;
+    } catch (_) {
+      return null;
+    } finally {
+      await player.dispose();
+      try {
+        await dir.delete(recursive: true);
+      } catch (_) {}
+    }
+  }
+}
+
+final audioDurationServiceProvider = Provider<AudioDurationService>(
+  (ref) => JustAudioDurationService(),
+);

@@ -121,6 +121,7 @@ class FakeSound implements SoundRepository {
   FakeSound({this.duplicate = false});
   final bool duplicate;
   final uploads = <String>[];
+  final durations = <int?>[];
   final played = <String>[];
 
   List<SoundFile> files = [
@@ -153,6 +154,7 @@ class FakeSound implements SoundRepository {
     required DateTime date,
     required String originalName,
     required Uint8List bytes,
+    int? durationSeconds,
   }) async {
     final stored = audioStoredName(
       position: position,
@@ -161,7 +163,15 @@ class FakeSound implements SoundRepository {
     );
     if (duplicate) throw DuplicateAudioException(stored);
     uploads.add('$conductorId/$stored:${bytes.length}');
+    durations.add(durationSeconds);
     return stored;
+  }
+
+  final deleted = <String>[];
+  @override
+  Future<void> deleteSound(SoundFile file) async {
+    deleted.add(file.messageId);
+    files = files.where((f) => f.messageId != file.messageId).toList();
   }
 
   @override
@@ -185,6 +195,11 @@ class FakeFiles implements AudioFileService {
     saved.add('$fileName:${bytes.length}');
     return true;
   }
+}
+
+class FakeDuration implements AudioDurationService {
+  @override
+  Future<int?> probe(String name, Uint8List bytes) async => 42;
 }
 
 class FakePlayer implements AudioPlayerService {
@@ -233,6 +248,7 @@ Future<TestEnv> pump(
         soundRepositoryProvider.overrideWithValue(env.sound),
         audioFileServiceProvider.overrideWithValue(env.files),
         audioPlayerProvider.overrideWithValue(env.player),
+        audioDurationServiceProvider.overrideWithValue(FakeDuration()),
       ],
       child: const RadioFlowApp(),
     ),
@@ -324,6 +340,7 @@ void main() {
         env.sound.uploads.single,
         'c1/03_Reportage_Marche_${_fmt(_day)}.mp3:5',
       );
+      expect(env.sound.durations, [42]);
       expect(
         find.textContaining('Envoyé sous le nom 03_Reportage_Marche_'),
         findsOneWidget,
@@ -408,6 +425,56 @@ void main() {
     await tester.tap(find.byTooltip('Télécharger'));
     await tester.pumpAndSettle();
     expect(env.files.saved, ['03_Reportage_Marche_2026-09-09.mp3:3']);
+  });
+
+  testWidgets('Espace Son : l’auteur supprime son son après confirmation', (
+    tester,
+  ) async {
+    final env = await pump(tester, 'Espace Son');
+    await tester.tap(find.byTooltip('Supprimer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+    expect(env.sound.deleted, isEmpty);
+
+    await tester.tap(find.byTooltip('Supprimer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    expect(env.sound.deleted, ['m1']);
+    expect(find.textContaining('Aucun fichier audio'), findsOneWidget);
+  });
+
+  testWidgets('Espace Son : édition verrouillée, seul l’admin supprime', (
+    tester,
+  ) async {
+    FakeSound locked() {
+      final f = FakeSound();
+      final o = f.files.single;
+      f.files = [
+        SoundFile(
+          messageId: o.messageId,
+          conductorId: o.conductorId,
+          conductorTitle: o.conductorTitle,
+          broadcastTime: o.broadcastTime,
+          lineId: o.lineId,
+          position: o.position,
+          lineTitle: o.lineTitle,
+          storagePath: o.storagePath,
+          uploadedBy: o.uploadedBy,
+          uploadedAt: o.uploadedAt,
+          duration: 95,
+          conductorLocked: true,
+        ),
+      ];
+      return f;
+    }
+
+    await pump(tester, 'Espace Son', sound: locked());
+    expect(find.byTooltip('Supprimer'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester, 'Espace Son', role: UserRole.admin, sound: locked());
+    expect(find.byTooltip('Supprimer'), findsOneWidget);
   });
 
   testWidgets('Espace Son vide', (tester) async {

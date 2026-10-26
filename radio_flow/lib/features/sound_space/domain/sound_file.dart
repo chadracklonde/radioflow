@@ -12,6 +12,7 @@ class SoundFile {
     required this.uploadedAt,
     this.originalName,
     this.duration,
+    this.conductorLocked = false,
   });
 
   final String messageId;
@@ -29,6 +30,9 @@ class SoundFile {
   final String? originalName;
   final int? duration;
 
+  /// Édition verrouillée ou diffusée : seul le rédacteur en chef modifie les sons.
+  final bool conductorLocked;
+
   /// Nom renommé automatiquement (dernier segment du chemin).
   String get storedName => storagePath.split('/').last;
 
@@ -45,5 +49,6 @@ class SoundFile {
     uploadedAt: DateTime.parse(j['uploaded_at'] as String),
     originalName: j['original_name'] as String?,
     duration: j['audio_duration'] as int?,
+    conductorLocked: const ['locked', 'aired'].contains(j['conductor_status']),
   );
 }

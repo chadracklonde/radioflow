@@ -31,7 +31,11 @@ abstract class SoundRepository {
     required DateTime date,
     required String originalName,
     required Uint8List bytes,
+    int? durationSeconds,
   });
+
+  /// Supprime le message audio puis le fichier.
+  Future<void> deleteSound(SoundFile file);
 
   Future<String> signedUrl(String path);
   Future<Uint8List> download(String path);
@@ -80,6 +84,7 @@ class SupabaseSoundRepository implements SoundRepository {
     required DateTime date,
     required String originalName,
     required Uint8List bytes,
+    int? durationSeconds,
   }) async {
     final stored = audioStoredName(
       position: position,
@@ -111,6 +116,7 @@ class SupabaseSoundRepository implements SoundRepository {
         'user_id': userId,
         'audio_file_url': path,
         'audio_original_name': originalName,
+        'audio_duration': durationSeconds,
       });
     } catch (_) {
       // Pas de fichier orphelin si le message n'a pas pu être publié.
@@ -118,6 +124,18 @@ class SupabaseSoundRepository implements SoundRepository {
       rethrow;
     }
     return stored;
+  }
+
+  @override
+  Future<void> deleteSound(SoundFile file) async {
+    // Le message d'abord : sans lui, plus personne ne voit le fichier.
+    final deleted = await _client
+        .from('messages')
+        .delete()
+        .eq('id', file.messageId)
+        .select('id');
+    if (deleted.isEmpty) throw StateError('Suppression refusée');
+    await _client.storage.from(_bucket).remove([file.storagePath]);
   }
 
   @override

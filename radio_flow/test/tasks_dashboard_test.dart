@@ -150,7 +150,10 @@ class FakeSound implements SoundRepository {
     required DateTime date,
     required String originalName,
     required Uint8List bytes,
+    int? durationSeconds,
   }) async => '';
+  @override
+  Future<void> deleteSound(SoundFile file) async {}
   @override
   Future<String> signedUrl(String path) async => '';
   @override

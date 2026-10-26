@@ -87,6 +87,10 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
     }
     setState(() => _uploading = true);
     try {
+      final bytes = await picked.readBytes();
+      final seconds = await ref
+          .read(audioDurationServiceProvider)
+          .probe(picked.name, bytes);
       final stored = await ref
           .read(soundRepositoryProvider)
           .upload(
@@ -96,7 +100,8 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
             position: line.position,
             date: conductor.broadcastDate,
             originalName: picked.name,
-            bytes: await picked.readBytes(),
+            bytes: bytes,
+            durationSeconds: seconds,
           );
       messenger.showSnackBar(
         SnackBar(content: Text('Envoyé sous le nom $stored')),

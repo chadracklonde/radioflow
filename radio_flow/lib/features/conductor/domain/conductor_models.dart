@@ -152,6 +152,45 @@ class BroadcastSlot {
   );
 }
 
+/// Chronométrage d'un conducteur : durée prévue par ligne, remplacée par la durée
+/// réelle du son quand il a été envoyé. Les lignes abandonnées ne comptent pas.
+class ConductorTiming {
+  const ConductorTiming({
+    required this.planned,
+    required this.estimated,
+    required this.withSound,
+    required this.counted,
+  });
+
+  final int planned;
+  final int estimated;
+  final int withSound;
+  final int counted;
+
+  /// [soundSeconds] : durée du son (le plus récent) par identifiant de ligne.
+  factory ConductorTiming.compute(
+    List<ConductorLine> lines,
+    Map<String, int> soundSeconds,
+  ) {
+    var planned = 0, estimated = 0, withSound = 0, counted = 0;
+    for (final l in lines) {
+      if (l.status == LineStatus.dropped) continue;
+      counted++;
+      final p = l.plannedDuration ?? 0;
+      final real = soundSeconds[l.id];
+      planned += p;
+      if (real != null) withSound++;
+      estimated += real ?? p;
+    }
+    return ConductorTiming(
+      planned: planned,
+      estimated: estimated,
+      withSound: withSound,
+      counted: counted,
+    );
+  }
+}
+
 /// 90 -> « 1:30 ».
 String formatDuration(int seconds) {
   final m = seconds ~/ 60;

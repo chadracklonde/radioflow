@@ -143,6 +143,38 @@ class _FileTile extends ConsumerWidget {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
 
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer ce son ?'),
+        content: Text(
+          '${file.storedName} sera supprimé pour toute l’équipe. Pour le remplacer, renvoyez ensuite le nouveau fichier depuis le fil de la ligne.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(soundRepositoryProvider).deleteSound(file);
+      ref.invalidate(soundFilesProvider);
+      if (context.mounted) _toast(context, '${file.storedName} supprimé.');
+    } catch (_) {
+      if (context.mounted) {
+        _toast(context, 'Suppression impossible (droits ou réseau).');
+      }
+    }
+  }
+
   Future<void> _download(BuildContext context, WidgetRef ref) async {
     try {
       final Uint8List bytes = await ref
@@ -166,6 +198,10 @@ class _FileTile extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final playing = ref.watch(nowPlayingProvider) == file.storagePath;
+    final me = ref.watch(profileProvider).value;
+    final canDelete =
+        me != null &&
+        (me.isAdmin || (me.id == file.uploadedBy && !file.conductorLocked));
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -221,6 +257,12 @@ class _FileTile extends ConsumerWidget {
               icon: Icon(Icons.download, color: c.mutedForeground),
               onPressed: () => _download(context, ref),
             ),
+            if (canDelete)
+              IconButton(
+                tooltip: 'Supprimer',
+                icon: Icon(Icons.delete_outline, color: c.mutedForeground),
+                onPressed: () => _delete(context, ref),
+              ),
           ],
         ),
       ),

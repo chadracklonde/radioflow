@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/data/profile_repository.dart';
+import '../../../core/utils/file_saver.dart';
+import '../../sound_space/data/sound_repository.dart';
+import '../data/conductor_export.dart';
 import '../data/conductor_repository.dart';
 import '../domain/conductor_models.dart';
 import 'line_form.dart';
@@ -22,6 +25,17 @@ class ConductorDetailScreen extends ConsumerWidget {
   /// Date au format yyyy-MM-dd, pour retrouver le conducteur dans le flux du jour.
   final String date;
 
+  /// Durée du son le plus récent de chaque ligne de ce conducteur.
+  Map<String, int> _soundSeconds(WidgetRef ref) {
+    final files = ref.watch(soundFilesProvider(date)).value ?? const [];
+    final sorted = [...files.where((f) => f.conductorId == conductorId)]
+      ..sort((a, b) => a.uploadedAt.compareTo(b.uploadedAt));
+    return {
+      for (final f in sorted)
+        if (f.duration != null) f.lineId: f.duration!,
+    };
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conductor = ref
@@ -33,11 +47,37 @@ class ConductorDetailScreen extends ConsumerWidget {
     final isAdmin = ref.watch(profileProvider).value?.isAdmin ?? false;
     final c = context.colors;
     final repo = ref.read(conductorRepositoryProvider);
+    final sounds = _soundSeconds(ref);
+
+    Future<void> export() async {
+      final messenger = ScaffoldMessenger.of(context);
+      final list = lines.value;
+      if (conductor == null || list == null) return;
+      try {
+        final bytes = await buildConductorPdf(conductor, list, sounds);
+        final name = conductorExportName(conductor);
+        final saved = await ref
+            .read(fileSaverProvider)
+            .save(fileName: name, bytes: bytes, mimeType: 'application/pdf');
+        if (saved) {
+          messenger.showSnackBar(SnackBar(content: Text('$name enregistré.')));
+        }
+      } catch (_) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Export impossible. Réessayez.')),
+        );
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(conductor?.title ?? 'Conducteur'),
         actions: [
+          IconButton(
+            tooltip: 'Exporter en PDF',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: conductor == null || lines.value == null ? null : export,
+          ),
           if (isAdmin && conductor != null)
             PopupMenuButton<ConductorStatus>(
               tooltip: 'Statut du conducteur',
@@ -83,6 +123,8 @@ class ConductorDetailScreen extends ConsumerWidget {
                 ],
               ),
             ),
+          if (lines.value != null && lines.value!.isNotEmpty)
+            _TimingBar(timing: ConductorTiming.compute(lines.value!, sounds)),
           Expanded(
             child: lines.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -115,10 +157,51 @@ class ConductorDetailScreen extends ConsumerWidget {
                     next: i < list.length - 1 ? list[i + 1] : null,
                     isAdmin: isAdmin,
                     conductorId: conductorId,
+                    soundSeconds: sounds[list[i].id],
                   ),
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimingBar extends StatelessWidget {
+  const _TimingBar({required this.timing});
+  final ConductorTiming timing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      color: c.muted,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.sm,
+      ),
+      child: Wrap(
+        spacing: Space.lg,
+        runSpacing: Space.xs,
+        children: [
+          Text(
+            'Prévu ${formatDuration(timing.planned)}',
+            style: text.bodyMedium?.copyWith(fontFamily: 'FiraCode'),
+          ),
+          Text(
+            'Estimé ${formatDuration(timing.estimated)}',
+            style: text.bodyMedium?.copyWith(
+              fontFamily: 'FiraCode',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            '${timing.withSound}/${timing.counted} lignes avec son',
+            style: text.bodySmall,
           ),
         ],
       ),
@@ -133,8 +216,10 @@ class _LineTile extends ConsumerWidget {
     required this.next,
     required this.isAdmin,
     required this.conductorId,
+    this.soundSeconds,
   });
 
+  final int? soundSeconds;
   final ConductorLine line;
   final ConductorLine? previous;
   final ConductorLine? next;
@@ -222,6 +307,24 @@ class _LineTile extends ConsumerWidget {
                             style: text.bodySmall?.copyWith(
                               fontFamily: 'FiraCode',
                             ),
+                          ),
+                        if (soundSeconds != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.audiotrack,
+                                size: 14,
+                                color: c.success,
+                              ),
+                              const SizedBox(width: Space.xs),
+                              Text(
+                                formatDuration(soundSeconds!),
+                                style: text.bodySmall?.copyWith(
+                                  fontFamily: 'FiraCode',
+                                ),
+                              ),
+                            ],
                           ),
                       ],
                     ),

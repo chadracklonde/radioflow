@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+import 'dart:typed_data';
+
 import 'package:radio_flow/app.dart';
+import 'package:radio_flow/core/utils/file_saver.dart';
 import 'package:radio_flow/features/auth/data/auth_repository.dart';
 import 'package:radio_flow/features/auth/data/profile_repository.dart';
 import 'package:radio_flow/features/conductor/data/conductor_repository.dart';
@@ -144,6 +148,19 @@ class FakeConductors implements ConductorRepository {
       calls.add('lstatus:${status.dbValue}');
 }
 
+class _Saver implements FileSaver {
+  final saved = <String, Uint8List>{};
+  @override
+  Future<bool> save({
+    required String fileName,
+    required Uint8List bytes,
+    required String mimeType,
+  }) async {
+    saved[fileName] = bytes;
+    return true;
+  }
+}
+
 class FakeThreads implements ThreadRepository {
   final sent = <String>[];
   @override
@@ -214,6 +231,7 @@ Future<(FakeConductors, FakeThreads)> pump(
   WidgetTester tester,
   UserRole role, {
   FakeConductors? conductors,
+  FileSaver? saver,
 }) async {
   await initializeDateFormatting('fr');
   tester.view.physicalSize = const Size(420, 900);
@@ -228,6 +246,7 @@ Future<(FakeConductors, FakeThreads)> pump(
         profileRepositoryProvider.overrideWithValue(Profiles(role)),
         conductorRepositoryProvider.overrideWithValue(repo),
         threadRepositoryProvider.overrideWithValue(threads),
+        if (saver != null) fileSaverProvider.overrideWithValue(saver),
       ],
       child: const RadioFlowApp(),
     ),
@@ -239,6 +258,67 @@ Future<(FakeConductors, FakeThreads)> pump(
 }
 
 void main() {
+  testWidgets('conducteur : export PDF et chronométrage affiché', (
+    tester,
+  ) async {
+    final saver = _Saver();
+    final repo = FakeConductors(
+      conductors: [_conductor(ConductorStatus.open)],
+      lines: _lines,
+    );
+    await pump(tester, UserRole.journalist, conductors: repo, saver: saver);
+    await tester.tap(find.text('Journal de 12h'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Prévu '), findsOneWidget);
+    expect(find.textContaining('Estimé '), findsOneWidget);
+    await tester.tap(find.byTooltip('Exporter en PDF'));
+    await tester.pumpAndSettle();
+    final name = saver.saved.keys.single;
+    expect(name, startsWith('RadioFlow_Conducteur_'));
+    expect(name, endsWith('.pdf'));
+    expect(String.fromCharCodes(saver.saved[name]!.take(4)), '%PDF');
+  });
+
+  test(
+    'chronométrage : le son remplace la durée prévue, abandonnées ignorées',
+    () {
+      const lines = [
+        ConductorLine(
+          id: 'a',
+          conductorId: 'c',
+          position: 1,
+          itemType: LineItemType.jingle,
+          title: 'A',
+          status: LineStatus.ready,
+          plannedDuration: 60,
+        ),
+        ConductorLine(
+          id: 'b',
+          conductorId: 'c',
+          position: 2,
+          itemType: LineItemType.reportage,
+          title: 'B',
+          status: LineStatus.planned,
+          plannedDuration: 120,
+        ),
+        ConductorLine(
+          id: 'c',
+          conductorId: 'c',
+          position: 3,
+          itemType: LineItemType.brief,
+          title: 'C',
+          status: LineStatus.dropped,
+          plannedDuration: 500,
+        ),
+      ];
+      final t = ConductorTiming.compute(lines, {'b': 150, 'c': 99});
+      expect(t.planned, 180);
+      expect(t.estimated, 210);
+      expect(t.withSound, 1);
+      expect(t.counted, 2);
+    },
+  );
+
   test('durées : mm:ss et secondes', () {
     expect(parseDuration('2:30'), 150);
     expect(parseDuration('150'), 150);
