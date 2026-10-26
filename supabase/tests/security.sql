@@ -354,6 +354,23 @@ select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
 select t.refused(format($$select public.add_conductor_line(%L, 'Intrus', 'brief', 30, gen_random_uuid())$$, :'mid'), 'un journaliste n''ajoute pas de ligne');
 reset role;
 
+-- Jetons d'appareil : un téléphone qui change de compte
+set role authenticated;
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select public.register_device_token('tok-partage', 'android');
+select t.eq((select count(*)::text from public.device_tokens where token = 'tok-partage'), '1', 'awa enregistre son téléphone');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000d', false);
+select t.eq((select count(*)::text from public.device_tokens where token = 'tok-partage'), '0', 'un autre compte ne voit pas ce jeton');
+select public.register_device_token('tok-partage', 'android');
+select t.eq((select count(*)::text from public.device_tokens where token = 'tok-partage'), '1', 'le jeton passe au nouveau compte');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.eq((select count(*)::text from public.device_tokens where token = 'tok-partage'), '0', 'l''ancien compte ne le voit plus');
+select t.refused($$select public.register_device_token('x', 'nintendo')$$, 'plateforme inconnue refusée');
+reset role;
+set role anon;
+select t.refused($$select public.register_device_token('x', 'android')$$, 'un visiteur n''enregistre pas d''appareil');
+reset role;
+
 -- ======================= Visiteur non connecté =======================
 reset role;
 set role anon;

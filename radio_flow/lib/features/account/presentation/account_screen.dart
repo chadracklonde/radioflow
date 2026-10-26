@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/local/local_store.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/data/profile_repository.dart';
+import '../../notifications/data/push_service.dart';
 
 /// Profil de l'utilisateur, changement de mot de passe et déconnexion.
 class AccountScreen extends ConsumerWidget {
@@ -354,6 +355,11 @@ class _SignOutButton extends ConsumerWidget {
       );
       if (ok != true) return;
     }
+    // Retire l'appareil du compte tant que la session est encore valide.
+    // (La déconnexion ne dépend jamais des notifications : toute erreur est ignorée.)
+    try {
+      await ref.read(pushServiceProvider).unregister();
+    } catch (_) {}
     await ref.read(authRepositoryProvider).signOut();
     await ref.read(localStoreProvider).clearCache();
   }

@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase (notifications push) : actif seulement une fois google-services.json ajouté.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "ml.rtcmali.radio_flow"
     compileSdk = flutter.compileSdkVersion

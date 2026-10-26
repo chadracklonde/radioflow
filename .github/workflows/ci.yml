@@ -116,7 +116,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/manage-team/index.ts
+      - run: deno check supabase/functions/manage-team/index.ts supabase/functions/send-push/index.ts
 
   secrets:
     name: Aucun secret versionné
