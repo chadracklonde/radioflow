@@ -2,8 +2,10 @@
 -- À exécuter une fois sur le projet Supabase (pg_net est une extension propre à Supabase :
 -- ce fichier n'est donc pas dans supabase/migrations, testées sur un PostgreSQL ordinaire).
 --
--- La clé utilisée est la clé publique (« publishable ») du projet. Elle ne donne aucun pouvoir
--- sur les données : la fonction relit tout dans la base et n'envoie chaque notification qu'une fois.
+-- La fonction send-push est déployée sans vérification de JWT (la passerelle Supabase refusait la
+-- clé publique du projet). Elle ne risque rien : elle ne reçoit qu'un identifiant de notification
+-- (uuid impossible à deviner, invisible sans compte), relit tout dans la base et n'envoie chaque
+-- notification qu'une seule fois (colonne pushed_at).
 
 create extension if not exists pg_net;
 
@@ -17,10 +19,7 @@ begin
   begin
     perform net.http_post(
       url := 'https://yjzzgduvoirjvhfjfszz.supabase.co/functions/v1/send-push',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer __PUBLISHABLE_KEY__'
-      ),
+      headers := jsonb_build_object('Content-Type', 'application/json'),
       body := jsonb_build_object('id', new.id)
     );
   exception when others then

@@ -1,6 +1,6 @@
 // Radio Flow : envoi des notifications push (Firebase Cloud Messaging, API HTTP v1).
 //
-// Appelée par un déclencheur de la base à chaque nouvelle notification (voir
+// Déployée avec verify_jwt = false (voir supabase/push_setup.sql). Appelée par un déclencheur de la base à chaque nouvelle notification (voir
 // supabase/push_setup.sql) avec { "id": "<uuid de la notification>" }.
 //
 // - L'identifiant seul suffit : le titre, le texte et le destinataire sont relus dans la base
