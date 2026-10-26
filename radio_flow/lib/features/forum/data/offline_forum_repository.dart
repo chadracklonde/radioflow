@@ -103,6 +103,11 @@ class OfflineForumRepository implements ForumRepository {
     source: p['source'] as String?,
   );
 
+  /// Le placement au conducteur exige le réseau (comme les décisions du forum).
+  @override
+  Future<void> linkToLine(String proposalId, String lineId) =>
+      remote.linkToLine(proposalId, lineId);
+
   @override
   Future<void> decide(String id, ProposalStatus status, {String? note}) =>
       remote.decide(id, status, note: note);

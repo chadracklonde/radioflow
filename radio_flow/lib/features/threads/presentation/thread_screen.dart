@@ -11,19 +11,29 @@ import '../../sound_space/data/audio_services.dart';
 import '../../sound_space/data/sound_repository.dart';
 import '../../../core/utils/audio_naming.dart';
 import '../../../shared/widgets/sync_banner.dart';
+import '../../forum/data/forum_repository.dart';
 import '../data/thread_repository.dart';
 import '../domain/thread_message.dart';
 
-/// Fil de discussion d'une ligne du conducteur (style Teams).
+/// Fil de discussion (style Teams), ouvert à toute l'équipe :
+/// - d'une ligne du conducteur (`conductorId` + `lineId`), avec envoi de sons;
+/// - d'un sujet validé (`proposalId`), dès la validation : texte pour tous, et les sons
+///   s'envoient depuis la ligne une fois le sujet placé dans un conducteur.
+/// Aucun statut ne désactive la saisie : seul le verrouillage d'un conducteur ferme l'envoi de sons.
 class ThreadScreen extends ConsumerStatefulWidget {
   const ThreadScreen({
     super.key,
-    required this.conductorId,
-    required this.lineId,
-  });
+    this.conductorId,
+    this.lineId,
+    this.proposalId,
+  }) : assert(
+         (proposalId != null) != (lineId != null && conductorId != null),
+         'Un fil se rattache soit à une ligne du conducteur, soit à un sujet',
+       );
 
-  final String conductorId;
-  final String lineId;
+  final String? conductorId;
+  final String? lineId;
+  final String? proposalId;
 
   @override
   ConsumerState<ThreadScreen> createState() => _ThreadScreenState();
@@ -112,20 +122,36 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final line = ref
-        .watch(linesProvider(widget.conductorId))
-        .value
-        ?.where((l) => l.id == widget.lineId)
-        .firstOrNull;
-    final threadId = ref.watch(threadIdProvider(widget.lineId));
+    final isProposal = widget.proposalId != null;
+    final line = isProposal
+        ? null
+        : ref
+              .watch(linesProvider(widget.conductorId!))
+              .value
+              ?.where((l) => l.id == widget.lineId)
+              .firstOrNull;
+    final proposal = !isProposal
+        ? null
+        : ref
+              .watch(forumProposalsProvider)
+              .value
+              ?.where((p) => p.id == widget.proposalId)
+              .firstOrNull;
+    final threadId = isProposal
+        ? ref.watch(proposalThreadIdProvider(widget.proposalId!))
+        : ref.watch(threadIdProvider(widget.lineId!));
     final profile = ref.watch(profileProvider).value;
     final names = ref.watch(authorNamesProvider).value ?? const {};
     final c = context.colors;
-    final conductor = ref
-        .watch(conductorsProvider(isoDate(ref.watch(selectedDateProvider))))
-        .value
-        ?.where((x) => x.id == widget.conductorId)
-        .firstOrNull;
+    final conductor = isProposal
+        ? null
+        : ref
+              .watch(
+                conductorsProvider(isoDate(ref.watch(selectedDateProvider))),
+              )
+              .value
+              ?.where((x) => x.id == widget.conductorId)
+              .firstOrNull;
     final canUpload =
         profile != null &&
         profile.canPropose &&
@@ -134,7 +160,13 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
         (profile.isAdmin || !conductor.status.isLocked);
 
     return Scaffold(
-      appBar: AppBar(title: Text(line?.title ?? 'Fil de discussion')),
+      appBar: AppBar(
+        title: Text(
+          isProposal
+              ? (proposal?.title ?? 'Discussion du sujet')
+              : (line?.title ?? 'Fil de discussion'),
+        ),
+      ),
       body: threadId.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) =>
@@ -143,6 +175,8 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
           final messages = ref.watch(messagesProvider(tid));
           return Column(
             children: [
+              if (isProposal)
+                _ProposalHint(placed: proposal?.conductorLineId != null),
               Expanded(
                 child: messages.when(
                   loading: () =>
@@ -300,6 +334,43 @@ class _MessageBubble extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Rappel en tête du fil d'un sujet : le texte est libre, les sons suivent le conducteur.
+class _ProposalHint extends StatelessWidget {
+  const _ProposalHint({required this.placed});
+  final bool placed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      width: double.infinity,
+      color: c.muted,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.md,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(
+            child: Icon(Icons.forum_outlined, size: 18, color: c.success),
+          ),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Text(
+              placed
+                  ? 'Ce sujet est placé dans un conducteur : les sons s\u2019envoient depuis sa ligne.'
+                  : 'Sujet validé : toute l\u2019équipe peut écrire ici. Les sons s\u2019enverront depuis le conducteur, une fois le sujet placé.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: c.foreground),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -130,6 +130,9 @@ class FakeForumRemote implements ForumRepository {
 
   @override
   Future<void> decide(String id, ProposalStatus status, {String? note}) async {}
+
+  @override
+  Future<void> linkToLine(String proposalId, String lineId) async {}
 }
 
 SyncService buildSync(

@@ -14,7 +14,9 @@ abstract class ConductorRepository {
   /// Crée les conducteurs de la date d'après la grille; renvoie le nombre créé.
   Future<int> generate(DateTime date);
   Future<void> addSlot({required String title, required String time});
-  Future<void> addLine({
+
+  /// Ajoute une ligne en fin de conducteur et renvoie son identifiant.
+  Future<String> addLine({
     required String conductorId,
     required String title,
     required LineItemType type,
@@ -79,13 +81,13 @@ class SupabaseConductorRepository implements ConductorRepository {
   }
 
   @override
-  Future<void> addLine({
+  Future<String> addLine({
     required String conductorId,
     required String title,
     required LineItemType type,
     int? plannedDuration,
   }) async {
-    await _client.rpc(
+    final id = await _client.rpc(
       'add_conductor_line',
       params: {
         'p_conductor_id': conductorId,
@@ -94,6 +96,7 @@ class SupabaseConductorRepository implements ConductorRepository {
         'p_planned_duration': plannedDuration,
       },
     );
+    return id as String;
   }
 
   @override

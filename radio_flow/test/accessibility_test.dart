@@ -91,6 +91,22 @@ Future<void> pumpApp(
   await tester.pumpAndSettle();
 }
 
+/// Fait défiler la liste du Forum (le bouton d'une carte basse est d'abord sous « Proposer un sujet »
+/// ou sous la barre de navigation), puis ouvre la première discussion de sujet validé.
+Future<void> openFirstDiscussion(WidgetTester tester) async {
+  final button = find.text('Ouvrir la discussion');
+  await tester.scrollUntilVisible(
+    button,
+    150,
+    scrollable: find.byType(Scrollable).last,
+  );
+  // encore un peu : sinon le bouton reste sous « Proposer un sujet »
+  await tester.drag(find.byType(ListView).last, const Offset(0, -120));
+  await tester.pumpAndSettle();
+  await tester.tap(button.first);
+  await tester.pumpAndSettle();
+}
+
 // Les sections à contrôler : libellé de l'onglet.
 const tabs = ['Forum', 'Conducteur', 'Espace Son', 'Tâches', 'Tableau de bord'];
 
@@ -247,6 +263,36 @@ void main() {
       await tester.tap(find.byTooltip('Mon compte'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Gérer l\u2019équipe'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: '${size.width}px x$scale');
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  for (final mode in [ThemeMode.dark, ThemeMode.light]) {
+    testWidgets(
+      'Discussion d’un sujet validé, thème ${mode == ThemeMode.dark ? 'sombre' : 'clair'} : accessibilité',
+      (tester) async {
+        await pumpApp(tester, size: const Size(375, 700), mode: mode);
+        await openFirstDiscussion(tester);
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Envoyer'), findsOneWidget);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+      },
+    );
+  }
+
+  testWidgets('Discussion d’un sujet : texte 2x et paysage sans débordement', (
+    tester,
+  ) async {
+    for (final (size, scale) in [
+      (const Size(375, 700), 2.0),
+      (const Size(667, 375), 1.0),
+    ]) {
+      await pumpApp(tester, size: size, mode: ThemeMode.dark, textScale: scale);
+      await openFirstDiscussion(tester);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: '${size.width}px x$scale');
       await tester.pumpWidget(const SizedBox());

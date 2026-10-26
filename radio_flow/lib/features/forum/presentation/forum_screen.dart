@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -239,6 +240,17 @@ class _ProposalCard extends ConsumerWidget {
                 child: Text(
                   'Note du rédacteur en chef : ${proposal.decisionNote}',
                   style: text.bodySmall?.copyWith(color: c.foreground),
+                ),
+              ),
+            ],
+            if (proposal.status == ProposalStatus.approved) ...[
+              const SizedBox(height: Space.md),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/forum/${proposal.id}/thread'),
+                  icon: const Icon(Icons.forum_outlined),
+                  label: const Text('Ouvrir la discussion'),
                 ),
               ),
             ],

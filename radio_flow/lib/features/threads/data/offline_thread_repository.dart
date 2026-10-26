@@ -42,6 +42,25 @@ class OfflineThreadRepository implements ThreadRepository {
   }
 
   @override
+  Future<String> threadIdForProposal(String proposalId) async {
+    final key = 'thread:proposal:$proposalId';
+    try {
+      final id = await remote.threadIdForProposal(proposalId);
+      await store.writeCache(key, [
+        {'id': id},
+      ]);
+      return id;
+    } catch (e) {
+      if (!isNetworkError(e)) rethrow;
+      final cached = await store.readCache(key);
+      if (cached != null && cached.isNotEmpty) {
+        return (cached.first as Map)['id'] as String;
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Stream<List<ThreadMessage>> watchMessages(String threadId) =>
       offlineFirst<ThreadMessage>(
         store: store,

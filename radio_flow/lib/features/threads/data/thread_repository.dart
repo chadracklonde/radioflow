@@ -9,6 +9,9 @@ import 'offline_thread_repository.dart';
 abstract class ThreadRepository {
   /// Identifiant du fil de la ligne (créé automatiquement par la base).
   Future<String> threadIdForLine(String lineId);
+
+  /// Identifiant du fil d'un sujet validé (créé par la base à la validation).
+  Future<String> threadIdForProposal(String proposalId);
   Stream<List<ThreadMessage>> watchMessages(String threadId);
   Future<void> sendText({
     String? id,
@@ -28,6 +31,16 @@ class SupabaseThreadRepository implements ThreadRepository {
         .from('discussion_threads')
         .select('id')
         .eq('conductor_line_id', lineId)
+        .single();
+    return row['id'] as String;
+  }
+
+  @override
+  Future<String> threadIdForProposal(String proposalId) async {
+    final row = await _client
+        .from('discussion_threads')
+        .select('id')
+        .eq('proposal_id', proposalId)
         .single();
     return row['id'] as String;
   }
@@ -71,6 +84,12 @@ final threadRepositoryProvider = Provider<ThreadRepository>(
 final threadIdProvider = FutureProvider.autoDispose.family<String, String>(
   (ref, lineId) => ref.watch(threadRepositoryProvider).threadIdForLine(lineId),
 );
+
+final proposalThreadIdProvider = FutureProvider.autoDispose
+    .family<String, String>(
+      (ref, proposalId) =>
+          ref.watch(threadRepositoryProvider).threadIdForProposal(proposalId),
+    );
 
 final messagesProvider = StreamProvider.autoDispose
     .family<List<ThreadMessage>, String>(

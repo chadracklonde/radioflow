@@ -45,6 +45,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Écrans plein écran, au-dessus de la coque de navigation.
       GoRoute(
         parentNavigatorKey: _rootKey,
+        path: '/forum/:proposalId/thread',
+        builder: (_, state) =>
+            ThreadScreen(proposalId: state.pathParameters['proposalId']!),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/team',
         builder: (_, _) => const TeamScreen(),
       ),

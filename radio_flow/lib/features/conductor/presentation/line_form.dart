@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../forum/data/forum_repository.dart';
+import '../../forum/domain/forum_proposal.dart';
 import '../data/conductor_repository.dart';
 import '../domain/conductor_models.dart';
 
@@ -32,6 +34,7 @@ class _LineFormState extends ConsumerState<_LineForm> {
   final _title = TextEditingController();
   final _duration = TextEditingController();
   LineItemType _type = LineItemType.reportage;
+  String? _proposalId;
   bool _busy = false;
   String? _error;
 
@@ -49,7 +52,7 @@ class _LineFormState extends ConsumerState<_LineForm> {
       _error = null;
     });
     try {
-      await ref
+      final lineId = await ref
           .read(conductorRepositoryProvider)
           .addLine(
             conductorId: widget.conductorId,
@@ -57,6 +60,25 @@ class _LineFormState extends ConsumerState<_LineForm> {
             type: _type,
             plannedDuration: parseDuration(_duration.text),
           );
+      // Sujet validé choisi : son fil de discussion devient celui de la ligne.
+      final proposalId = _proposalId;
+      if (proposalId != null) {
+        try {
+          await ref
+              .read(forumRepositoryProvider)
+              .linkToLine(proposalId, lineId);
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Ligne ajoutée, mais le sujet n\u2019a pas pu y être lié. Réessayez depuis le Forum.',
+                ),
+              ),
+            );
+          }
+        }
+      }
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) {
@@ -116,6 +138,55 @@ class _LineFormState extends ConsumerState<_LineForm> {
                 onChanged: (t) => setState(() => _type = t ?? _type),
               ),
               const SizedBox(height: Space.lg),
+              Builder(
+                builder: (context) {
+                  final candidates =
+                      (ref.watch(forumProposalsProvider).value ??
+                              const <ForumProposal>[])
+                          .where(
+                            (p) =>
+                                p.status == ProposalStatus.approved &&
+                                p.conductorLineId == null,
+                          )
+                          .toList();
+                  if (candidates.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: Space.lg),
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: _proposalId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Sujet validé (facultatif)',
+                        helperText: 'Sa discussion devient celle de la ligne, rien n\u2019est perdu.',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Aucun'),
+                        ),
+                        for (final p in candidates)
+                          DropdownMenuItem<String?>(
+                            value: p.id,
+                            child: Text(
+                              p.title,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (id) => setState(() {
+                        _proposalId = id;
+                        if (id != null && _title.text.trim().isEmpty) {
+                          _title.text = candidates
+                              .firstWhere((p) => p.id == id)
+                              .title;
+                        }
+                      }),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: Space.lg),
+
               TextFormField(
                 controller: _duration,
                 keyboardType: TextInputType.datetime,

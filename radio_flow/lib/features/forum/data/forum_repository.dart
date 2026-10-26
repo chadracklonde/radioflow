@@ -21,6 +21,9 @@ abstract class ForumRepository {
 
   /// Décision du rédacteur en chef (RLS : réservé à l'admin).
   Future<void> decide(String id, ProposalStatus status, {String? note});
+
+  /// Place un sujet validé sur une ligne du conducteur : son fil de discussion devient celui de la ligne.
+  Future<void> linkToLine(String proposalId, String lineId);
 }
 
 class SupabaseForumRepository implements ForumRepository {
@@ -64,6 +67,14 @@ class SupabaseForumRepository implements ForumRepository {
               : note.trim(),
         })
         .eq('id', id);
+  }
+
+  @override
+  Future<void> linkToLine(String proposalId, String lineId) async {
+    await _client.rpc(
+      'link_proposal_to_line',
+      params: {'p_proposal_id': proposalId, 'p_line_id': lineId},
+    );
   }
 }
 

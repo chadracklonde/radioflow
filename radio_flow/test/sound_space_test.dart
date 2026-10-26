@@ -79,12 +79,12 @@ class _Conductors implements ConductorRepository {
   @override
   Future<void> addSlot({required String title, required String time}) async {}
   @override
-  Future<void> addLine({
+  Future<String> addLine({
     required String conductorId,
     required String title,
     required LineItemType type,
     int? plannedDuration,
-  }) async {}
+  }) async => 'new-line';
   @override
   Future<void> swapLines(String a, String b) async {}
   @override
@@ -96,6 +96,9 @@ class _Conductors implements ConductorRepository {
 class _Threads implements ThreadRepository {
   @override
   Future<String> threadIdForLine(String lineId) async => 't-$lineId';
+  @override
+  Future<String> threadIdForProposal(String proposalId) async =>
+      'tp-$proposalId';
   @override
   Stream<List<ThreadMessage>> watchMessages(String threadId) =>
       Stream.value(const []);

@@ -39,6 +39,14 @@ Mode hors ligne : base SQLite locale (`radio_flow.db`) avec une file d'envoi et 
 
 Non fait : polices Fira (le téléchargement des fichiers est bloqué depuis ce conteneur; à placer dans `assets/fonts/` puis déclarer `FiraSans` et `FiraCode` dans `pubspec.yaml`), compilation Android / iOS / macOS / Windows.
 
+## Discussion d'un sujet validé
+
+Un fil de discussion est créé par la base dès qu'un sujet passe à « validé » (déclencheur sur `forum_proposals`). Toute l'équipe (journalistes, techniciens, rédacteur en chef) peut y écrire du texte tout de suite : les règles d'accès sur `messages` ne dépendent d'aucun statut de sujet, et l'interface n'en tient pas compte non plus. Les fils eux-mêmes (structure) restent gérés par le rédacteur en chef.
+
+- **Forum** : la carte d'un sujet validé offre « Ouvrir la discussion » (écran `ThreadScreen`, route `/forum/:proposalId/thread`).
+- **Conducteur** : en ajoutant une ligne, le rédacteur en chef peut choisir un sujet validé; le fil du sujet devient celui de la ligne (les messages déjà écrits sur la ligne rejoignent le fil). Les sons peuvent alors être envoyés depuis la ligne, jusqu'au verrouillage du conducteur. Avant le placement, seuls les textes sont possibles.
+- **Suppression d'une ligne** : la discussion du sujet est conservée et le sujet peut être replacé.
+
 ## Arborescence `lib/` (par fonctionnalité)
 
 ```

@@ -83,17 +83,18 @@ class FakeConductors implements ConductorRepository {
   Future<void> addSlot({required String title, required String time}) async {}
 
   @override
-  Future<void> addLine({
+  Future<String> addLine({
     required String conductorId,
     required String title,
     required LineItemType type,
     int? plannedDuration,
   }) async {
     calls.add('add:$title:${plannedDuration ?? '-'}');
+    final newId = 'l${lines.length + 1}';
     lines = [
       ...lines,
       ConductorLine(
-        id: 'l${lines.length + 1}',
+        id: newId,
         conductorId: conductorId,
         position: lines.length + 1,
         itemType: type,
@@ -103,6 +104,7 @@ class FakeConductors implements ConductorRepository {
       ),
     ];
     _changes.add(null);
+    return newId;
   }
 
   @override
@@ -119,6 +121,9 @@ class FakeThreads implements ThreadRepository {
   final sent = <String>[];
   @override
   Future<String> threadIdForLine(String lineId) async => 't-$lineId';
+  @override
+  Future<String> threadIdForProposal(String proposalId) async =>
+      'tp-$proposalId';
   @override
   Stream<List<ThreadMessage>> watchMessages(String threadId) => Stream.value([
     ThreadMessage(

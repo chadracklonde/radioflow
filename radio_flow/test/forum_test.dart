@@ -64,6 +64,7 @@ class FakeForum implements ForumRepository {
   ];
   final _ctrl = StreamController<List<ForumProposal>>.broadcast();
   final decisions = <String>[];
+  final links = <String>[];
   final proposed = <String>[];
 
   @override
@@ -87,6 +88,11 @@ class FakeForum implements ForumRepository {
   @override
   Future<void> decide(String id, ProposalStatus status, {String? note}) async {
     decisions.add('$id:${status.dbValue}:${note ?? ''}');
+  }
+
+  @override
+  Future<void> linkToLine(String proposalId, String lineId) async {
+    links.add('$proposalId:$lineId');
   }
 }
 
