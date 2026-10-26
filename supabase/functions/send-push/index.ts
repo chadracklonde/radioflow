@@ -42,8 +42,7 @@ async function accessToken(sa: ServiceAccount): Promise<string> {
     exp: now + 3600,
   }));
   const pem = sa.private_key
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/-----(BEGIN|END) [A-Z ]+-----/g, "")
     .replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
