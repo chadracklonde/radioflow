@@ -44,7 +44,7 @@ end $$;
 grant execute on all functions in schema t to public;
 grant usage on schema public, auth, storage to authenticated;
 grant all on all tables in schema public to authenticated;
-grant select, insert, delete on storage.objects to authenticated;
+grant select, insert, update, delete on storage.objects to authenticated;
 grant execute on all functions in schema public, auth, storage to authenticated;
 
 -- Comptes : chef (super admin), redac (rédacteur en chef), awa (journaliste), tech (technicien)
@@ -233,6 +233,115 @@ select t.eq((select count(*)::text from public.discussion_threads where id = :'p
 select t.eq((select (conductor_line_id is null)::text from public.discussion_threads where id = :'pth'), 'true', 'le fil n''est plus rattaché à une ligne');
 select t.eq((select count(*)::text from public.messages where thread_id = :'pth'), '6', 'aucun message perdu');
 select t.eq((select (conductor_line_id is null)::text from public.forum_proposals where id = 'aaaaaaaa-0000-0000-0000-000000000001'), 'true', 'le sujet peut être replacé');
+
+-- ======================= Améliorations du quotidien (migration 1000) =======================
+reset role;
+set role authenticated;
+
+-- Modèles de conducteur et durée cible
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+insert into public.broadcast_slots (id, title, broadcast_time, duration_seconds)
+  values ('dddddddd-0000-0000-0000-000000000001', 'Matinale', '06:00', 1800);
+select public.generate_conductors('2026-10-01');
+select t.eq((select count(*)::text from public.conductors where title = 'Matinale' and broadcast_date = '2026-10-01'), '1', 'génération : le créneau Matinale est créé');
+select t.eq((select target_duration::text from public.conductors where title = 'Matinale' and broadcast_date = '2026-10-01'), '1800', 'le conducteur reprend la durée cible du créneau');
+select id as mid from public.conductors where title = 'Matinale' and broadcast_date = '2026-10-01' \gset
+select public.add_conductor_line(:'mid', 'Générique', 'jingle', 10);
+select public.add_conductor_line(:'mid', 'Titres', 'brief', 120) as ml2 \gset
+select public.add_conductor_line(:'mid', 'Abandonné', 'other', 30) as ml3 \gset
+update public.conductor_lines set status = 'dropped' where id = :'ml3';
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.refused(format($$select public.save_conductor_as_template(%L)$$, :'mid'), 'un journaliste n''enregistre pas de modèle');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+select public.save_conductor_as_template(:'mid') as ntpl \gset
+select t.eq(:'ntpl', '2', 'le modèle garde les lignes non abandonnées');
+select public.generate_conductors('2026-10-02');
+select t.eq((select count(*)::text from public.conductor_lines l join public.conductors c on c.id = l.conductor_id where c.broadcast_date = '2026-10-02' and c.title = 'Matinale'), '2', 'un nouveau conducteur reprend les lignes du modèle');
+select t.eq((select string_agg(l.title, ',' order by l.position_index) from public.conductor_lines l join public.conductors c on c.id = l.conductor_id where c.broadcast_date = '2026-10-02' and c.title = 'Matinale'), 'Générique,Titres', 'ordre et titres du modèle');
+select t.eq(public.generate_conductors('2026-10-02')::text, '0', 'pas de doublon à la seconde génération');
+
+-- Texte à lire à l'antenne
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000d', false);
+select t.refused(format($$select public.set_line_script(%L, 'x')$$, :'ml2'), 'un technicien n''écrit pas le texte');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select public.set_line_script(:'ml2', 'Bonjour à toutes et à tous');
+select t.eq((select script from public.conductor_lines where id = :'ml2'), 'Bonjour à toutes et à tous', 'un journaliste écrit le texte');
+select t.touches_nothing($$update public.conductor_lines set script = 'direct' where true$$, 'le texte ne s''écrit pas par une mise à jour directe');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+update public.conductors set status = 'locked' where id = :'mid';
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.refused(format($$select public.set_line_script(%L, 'tard')$$, :'ml2'), 'texte verrouillé avec le conducteur');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+select public.set_line_script(:'ml2', 'Corrigé par le rédacteur en chef');
+select t.eq((select script from public.conductor_lines where id = :'ml2'), 'Corrigé par le rédacteur en chef', 'le rédacteur en chef écrit malgré le verrou');
+
+-- Historique
+select t.eq((select count(*)::text from public.conductor_history where conductor_id = :'mid' and summary like 'Ligne 1 ajoutée%'), '1', 'historique : ajout de ligne');
+select t.eq((select count(*)::text from public.conductor_history where conductor_id = :'mid' and summary like 'Texte de%'), '2', 'historique : modifications du texte');
+select t.eq((select count(*)::text from public.conductor_history where conductor_id = :'mid' and summary like 'Conducteur : statut%'), '1', 'historique : changement de statut');
+select t.refused($$insert into public.conductor_history (conductor_id, summary) values (gen_random_uuid(), 'faux')$$, 'l''historique ne s''écrit pas à la main');
+select t.touches_nothing($$delete from public.conductor_history$$, 'l''historique ne s''efface pas');
+
+-- Sons : technicien autorisé à envoyer, suppression suivant le verrou
+update public.conductors set status = 'open' where id = :'mid';
+select id as mth from public.discussion_threads where conductor_line_id = :'ml2' \gset
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000d', false);
+insert into storage.objects (bucket_id, name, owner) values ('conductor-audio', :'mid' || '/02_Titres_2026-10-01.mp3', auth.uid());
+insert into public.messages (thread_id, user_id, audio_file_url, audio_original_name)
+  values (:'mth', auth.uid(), :'mid' || '/02_Titres_2026-10-01.mp3', 'Titres.mp3') returning id as mmsg \gset
+select t.eq((select count(*)::text from public.conductor_history where conductor_id = :'mid' and summary like 'Son ajouté%'), '1', 'historique : son ajouté (technicien autorisé)');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+update public.conductors set status = 'locked' where id = :'mid';
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000d', false);
+select t.refused(format($$delete from public.messages where id = %L$$, :'mmsg'), 'pas de suppression de son sur un conducteur verrouillé');
+select t.touches_nothing(format($$delete from storage.objects where name = %L$$, :'mid' || '/02_Titres_2026-10-01.mp3'), 'fichier non supprimable sur un conducteur verrouillé');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+select t.touches_rows(format($$delete from public.messages where id = %L$$, :'mmsg'), 1, 'le rédacteur en chef supprime le son malgré le verrou');
+update public.conductors set status = 'open' where id = :'mid';
+select t.touches_rows(format($$update storage.objects set name = %L where name = %L$$, :'mid' || '/01_Titres_2026-10-01.mp3', :'mid' || '/02_Titres_2026-10-01.mp3'), 1, 'le rédacteur en chef renomme un fichier');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.touches_nothing(format($$update storage.objects set name = 'x/y.mp3' where name = %L$$, :'mid' || '/01_Titres_2026-10-01.mp3'), 'un journaliste ne renomme pas un fichier');
+
+-- Suppléance
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000e', false);
+select t.eq(public.app_role()::text, 'journalist', 'avant suppléance : journaliste');
+select t.refused(format($$select public.set_deputy(%L, now() + interval '5 days')$$, '00000000-0000-0000-0000-00000000000e'), 'on ne se désigne pas suppléant');
+select t.refused($$update public.users set deputy_until = now() + interval '5 days' where id = auth.uid()$$, 'pas de suppléance par mise à jour directe');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+select t.refused(format($$select public.set_deputy(%L, now() + interval '5 days')$$, '00000000-0000-0000-0000-00000000000e'), 'le rédacteur en chef ordinaire ne désigne pas de suppléant');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000a', false);
+select t.refused(format($$select public.set_deputy(%L, now() + interval '200 days')$$, '00000000-0000-0000-0000-00000000000e'), 'suppléance limitée à 90 jours');
+select public.set_deputy('00000000-0000-0000-0000-00000000000e', now() + interval '5 days');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000e', false);
+select t.eq(public.app_role()::text, 'admin', 'pendant la suppléance : droits du rédacteur en chef');
+select t.touches_rows($$update public.conductors set status = 'open' where id = (select id from public.conductors where title = 'Matinale' and broadcast_date = '2026-10-01')$$, 1, 'le suppléant modifie un conducteur');
+select t.touches_nothing($$update public.users set role = 'technician' where email = 'awa@rtc.ml'$$, 'le suppléant ne gère pas l''équipe');
+reset role;
+select set_config('app.uid', '', false);
+update public.users set deputy_until = now() - interval '1 minute' where email = 'moussa@rtc.ml';
+set role authenticated;
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000e', false);
+select t.eq(public.app_role()::text, 'journalist', 'suppléance expirée : retour au rôle d''origine');
+
+-- Notifications
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+insert into public.forum_proposals (id, author_id, title, angle, format)
+  values ('aaaaaaaa-0000-0000-0000-0000000000f1', auth.uid(), 'Barrage de Sélingué', 'angle', 'interview');
+select t.eq((select count(*)::text from public.notifications where user_id = auth.uid() and kind = 'proposal.new'), '0', 'l''auteur n''est pas notifié de sa propre proposition');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000b', false);
+select t.eq((select count(*)::text from public.notifications where kind = 'proposal.new' and title = 'Nouveau sujet proposé' and body = 'Barrage de Sélingué'), '1', 'chaque rédacteur en chef ne voit que sa notification (la sienne)');
+update public.forum_proposals set status = 'approved', decided_by = auth.uid() where id = 'aaaaaaaa-0000-0000-0000-0000000000f1';
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000c', false);
+select t.eq((select count(*)::text from public.notifications where kind = 'proposal.approved' and body = 'Barrage de Sélingué'), '1', 'l''auteur est notifié de la validation');
+select t.touches_nothing($$update public.notifications set read_at = now()$$, 'pas de modification directe des notifications');
+select t.touches_nothing($$delete from public.notifications$$, 'pas de suppression des notifications');
+select public.mark_notifications_read();
+select t.eq((select count(*)::text from public.notifications where read_at is null), '0', 'notifications marquées comme lues');
+select t.eq((select count(*)::text from public.notifications), (select count(*)::text from public.notifications where user_id = auth.uid()), 'chacun ne voit que ses notifications');
+insert into public.device_tokens (token, user_id, platform) values ('tok-awa', auth.uid(), 'android');
+select set_config('app.uid', '00000000-0000-0000-0000-00000000000e', false);
+select t.touches_nothing($$delete from public.device_tokens$$, 'les jetons d''un autre ne sont pas visibles');
+reset role;
 
 -- ======================= Visiteur non connecté =======================
 reset role;
