@@ -20,3 +20,4 @@ supabase/.branches/
 # Sorties de test / temporaires
 *.log
 coverage/
+.firebase/
