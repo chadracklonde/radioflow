@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -41,6 +42,29 @@ class DiskPendingAudioStore implements PendingAudioStore {
   }
 }
 
+/// Web : pas de disque. Les sons en attente restent en mémoire tant que l'onglet est ouvert.
+class MemoryPendingAudioStore implements PendingAudioStore {
+  final _files = <String, Uint8List>{};
+  int _next = 1;
+
+  @override
+  Future<String> save(Uint8List bytes) async {
+    final ref = 'mem-${_next++}';
+    _files[ref] = bytes;
+    return ref;
+  }
+
+  @override
+  Future<Uint8List> read(String ref) async {
+    final bytes = _files[ref];
+    if (bytes == null) throw StateError('Fichier en attente introuvable');
+    return bytes;
+  }
+
+  @override
+  Future<void> delete(String ref) async => _files.remove(ref);
+}
+
 final pendingAudioStoreProvider = Provider<PendingAudioStore>(
-  (ref) => DiskPendingAudioStore(),
+  (ref) => kIsWeb ? MemoryPendingAudioStore() : DiskPendingAudioStore(),
 );

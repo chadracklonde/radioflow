@@ -39,6 +39,9 @@ jobs:
         run: flutter analyze
       - name: Tests
         run: flutter test
+      # La version web doit rester compilable (pas de SQLite ni de fichiers locaux).
+      - name: Compilation web
+        run: flutter build web --release
 
   android:
     name: Android (compilation version de production)

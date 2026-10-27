@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/sqlite3.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/network/supabase_config.dart';
 import 'data/local/local_store.dart';
+import 'data/local/open_store_io.dart'
+    if (dart.library.js_interop) 'data/local/open_store_web.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,14 +18,12 @@ Future<void> main() async {
   );
 
   // Base locale : file d'envoi hors ligne et dernières données consultées.
-  final dir = await getApplicationSupportDirectory();
-  final db = sqlite3.open(p.join(dir.path, 'radio_flow.db'));
+  final store = await openLocalStore();
 
   runApp(
     ProviderScope(
       overrides: [
         localStoreProvider.overrideWith((ref) {
-          final store = LocalStore(db);
           ref.onDispose(store.dispose);
           return store;
         }),

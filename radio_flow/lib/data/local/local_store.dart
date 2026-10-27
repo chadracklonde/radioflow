@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 /// Opération d'écriture en attente d'envoi (rédigée hors ligne).
 class OutboxItem {
@@ -27,139 +26,166 @@ class OutboxItem {
   bool get failed => error != null;
 }
 
-/// Stockage local SQLite : file d'attente d'écritures + dernière version des listes consultées.
-class LocalStore {
-  LocalStore(this._db) {
-    _db.execute('''
-      create table if not exists outbox (
-        id integer primary key autoincrement,
-        kind text not null,
-        payload text not null,
-        created_at text not null,
-        attempts integer not null default 0,
-        error text
-      );
-      create table if not exists cache (
-        key text primary key,
-        json text not null,
-        updated_at text not null
-      );
-    ''');
-  }
+/// Stockage local : file d'attente d'écritures + dernière version des listes consultées.
+///
+/// - [SqlLocalStore] (téléphone, ordinateur) : base SQLite sur le disque, conservée entre deux lancements.
+/// - [MemoryLocalStore] (web, tests) : en mémoire, perdue à la fermeture de l'onglet.
+abstract class LocalStore {
+  Future<OutboxItem> enqueue(String kind, Map<String, dynamic> payload);
+  Future<List<OutboxItem>> items();
 
-  final Database _db;
+  /// Émet la file actuelle, puis à chaque changement.
+  Stream<List<OutboxItem>> watch();
+  Future<bool> hasPending();
+  Future<void> remove(int id);
+  Future<void> recordAttempt(int id);
+  Future<void> markFailed(int id, String error);
+
+  /// Remet les opérations refusées dans la file.
+  Future<void> retryFailed();
+  Future<void> discardFailed();
+  Future<List<dynamic>?> readCache(String key);
+  Future<void> writeCache(String key, List<Map<String, dynamic>> rows);
+
+  /// À la déconnexion : les données consultées ne doivent pas rester pour le prochain utilisateur.
+  /// La file d'attente est conservée pour ne perdre aucune rédaction.
+  Future<void> clearCache();
+  void dispose();
+}
+
+/// Stockage en mémoire : utilisé sur le web (pas de base locale persistante) et dans les tests.
+class MemoryLocalStore implements LocalStore {
+  final _items = <OutboxItem>[];
+  final _cache = <String, List<dynamic>>{};
   final _changes = StreamController<void>.broadcast();
+  int _nextId = 1;
 
   void _notify() {
     if (!_changes.isClosed) _changes.add(null);
   }
 
-  List<OutboxItem> _readItems() {
-    final rows = _db.select(
-      'select id, kind, payload, created_at, attempts, error from outbox order by id',
-    );
-    return [
-      for (final r in rows)
-        OutboxItem(
-          id: r['id'] as int,
-          kind: r['kind'] as String,
-          payload: jsonDecode(r['payload'] as String) as Map<String, dynamic>,
-          createdAt: DateTime.parse(r['created_at'] as String),
-          attempts: r['attempts'] as int,
-          error: r['error'] as String?,
-        ),
-    ];
+  void _replace(int id, OutboxItem Function(OutboxItem) change) {
+    final i = _items.indexWhere((x) => x.id == id);
+    if (i >= 0) _items[i] = change(_items[i]);
   }
 
+  @override
   Future<OutboxItem> enqueue(String kind, Map<String, dynamic> payload) async {
-    _db.execute(
-      'insert into outbox (kind, payload, created_at) values (?, ?, ?)',
-      [kind, jsonEncode(payload), DateTime.now().toUtc().toIso8601String()],
+    // copie JSON : comme sur disque, la file ne garde pas de référence vivante
+    final item = OutboxItem(
+      id: _nextId++,
+      kind: kind,
+      payload: jsonDecode(jsonEncode(payload)) as Map<String, dynamic>,
+      createdAt: DateTime.now().toUtc(),
+      attempts: 0,
     );
-    final id = _db.lastInsertRowId;
+    _items.add(item);
     _notify();
-    return _readItems().firstWhere((i) => i.id == id);
+    return item;
   }
 
-  Future<List<OutboxItem>> items() async => _readItems();
+  @override
+  Future<List<OutboxItem>> items() async => List.of(_items);
 
-  /// Émet la file actuelle, puis à chaque changement.
-  /// (Pas de `async*` : l'annulation d'un tel flux attendrait le prochain changement.)
+  @override
   Stream<List<OutboxItem>> watch() {
     late final StreamController<List<OutboxItem>> out;
     StreamSubscription<void>? sub;
     out = StreamController<List<OutboxItem>>(
       onListen: () {
-        out.add(_readItems());
-        sub = _changes.stream.listen((_) => out.add(_readItems()));
+        out.add(List.of(_items));
+        sub = _changes.stream.listen((_) => out.add(List.of(_items)));
       },
       onCancel: () => sub?.cancel(),
     );
     return out.stream;
   }
 
-  Future<bool> hasPending() async =>
-      (_db
-              .select('select count(*) c from outbox where error is null')
-              .first['c']
-          as int) >
-      0;
+  @override
+  Future<bool> hasPending() async => _items.any((i) => !i.failed);
 
+  @override
   Future<void> remove(int id) async {
-    _db.execute('delete from outbox where id = ?', [id]);
+    _items.removeWhere((i) => i.id == id);
     _notify();
   }
 
-  Future<void> recordAttempt(int id) async {
-    _db.execute('update outbox set attempts = attempts + 1 where id = ?', [id]);
-  }
+  @override
+  Future<void> recordAttempt(int id) async => _replace(
+    id,
+    (i) => OutboxItem(
+      id: i.id,
+      kind: i.kind,
+      payload: i.payload,
+      createdAt: i.createdAt,
+      attempts: i.attempts + 1,
+      error: i.error,
+    ),
+  );
 
+  @override
   Future<void> markFailed(int id, String error) async {
-    _db.execute(
-      'update outbox set error = ?, attempts = attempts + 1 where id = ?',
-      [error, id],
+    _replace(
+      id,
+      (i) => OutboxItem(
+        id: i.id,
+        kind: i.kind,
+        payload: i.payload,
+        createdAt: i.createdAt,
+        attempts: i.attempts + 1,
+        error: error,
+      ),
     );
     _notify();
   }
 
-  /// Remet les opérations refusées dans la file.
+  @override
   Future<void> retryFailed() async {
-    _db.execute('update outbox set error = null where error is not null');
+    for (final i in List.of(_items)) {
+      if (i.failed) {
+        _replace(
+          i.id,
+          (x) => OutboxItem(
+            id: x.id,
+            kind: x.kind,
+            payload: x.payload,
+            createdAt: x.createdAt,
+            attempts: x.attempts,
+          ),
+        );
+      }
+    }
     _notify();
   }
 
+  @override
   Future<void> discardFailed() async {
-    _db.execute('delete from outbox where error is not null');
+    _items.removeWhere((i) => i.failed);
     _notify();
   }
 
+  @override
   Future<List<dynamic>?> readCache(String key) async {
-    final rows = _db.select('select json from cache where key = ?', [key]);
-    if (rows.isEmpty) return null;
-    return jsonDecode(rows.first['json'] as String) as List<dynamic>;
+    final v = _cache[key];
+    return v == null ? null : jsonDecode(jsonEncode(v)) as List<dynamic>;
   }
 
+  @override
   Future<void> writeCache(String key, List<Map<String, dynamic>> rows) async {
-    _db.execute(
-      'insert into cache (key, json, updated_at) values (?, ?, ?) '
-      'on conflict(key) do update set json = excluded.json, updated_at = excluded.updated_at',
-      [key, jsonEncode(rows), DateTime.now().toUtc().toIso8601String()],
-    );
+    _cache[key] = jsonDecode(jsonEncode(rows)) as List<dynamic>;
   }
 
-  /// À la déconnexion : les données consultées ne doivent pas rester pour le prochain utilisateur.
-  /// La file d'attente est conservée pour ne perdre aucune rédaction.
-  Future<void> clearCache() async => _db.execute('delete from cache');
+  @override
+  Future<void> clearCache() async => _cache.clear();
 
-  void dispose() {
-    _changes.close();
-    _db.close();
-  }
+  @override
+  void dispose() => _changes.close();
 }
 
-/// Remplacé dans `main()` par la base du disque; en mémoire par défaut (tests).
+/// Remplacé dans `main()` par la base du disque (téléphone, ordinateur); en mémoire par défaut
+/// (web, tests).
 final localStoreProvider = Provider<LocalStore>((ref) {
-  final store = LocalStore(sqlite3.openInMemory());
+  final store = MemoryLocalStore();
   ref.onDispose(store.dispose);
   return store;
 });

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:radio_flow/app.dart';
-import 'package:radio_flow/data/local/local_store.dart';
+import 'package:radio_flow/data/local/sql_local_store.dart';
 import 'package:radio_flow/data/sync/sync_service.dart';
 import 'package:radio_flow/features/auth/data/auth_repository.dart';
 import 'package:radio_flow/features/auth/data/profile_repository.dart';
@@ -331,7 +331,7 @@ void main() {
 
   group('fil d’un sujet hors ligne', () {
     test('l’identifiant du fil est mémorisé et retrouvé sans réseau', () async {
-      final store = LocalStore(sqlite3.openInMemory());
+      final store = SqlLocalStore(sqlite3.openInMemory());
       final net = ot.FakeConnectivity();
       final sync = SyncService(
         store: store,

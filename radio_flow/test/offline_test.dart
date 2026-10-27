@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:radio_flow/app.dart';
 import 'package:radio_flow/core/network/network_errors.dart';
 import 'package:radio_flow/data/local/local_store.dart';
+import 'package:radio_flow/data/local/sql_local_store.dart';
 import 'package:radio_flow/data/sync/connectivity_service.dart';
 import 'package:radio_flow/data/sync/offline_stream.dart';
 import 'package:radio_flow/data/sync/sync_engine.dart';
@@ -26,7 +27,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 const _offline = SocketException('Failed host lookup');
 
-LocalStore memoryStore() => LocalStore(sqlite3.openInMemory());
+LocalStore memoryStore() => SqlLocalStore(sqlite3.openInMemory());
 
 class FakeConnectivity implements ConnectivityService {
   FakeConnectivity({this.online = true});
@@ -198,14 +199,14 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('radio_flow_test');
       addTearDown(() => dir.deleteSync(recursive: true));
       final path = '${dir.path}/db.sqlite';
-      final first = LocalStore(sqlite3.open(path));
+      final first = SqlLocalStore(sqlite3.open(path));
       await first.enqueue('task.add', {'id': 't1', 'title': 'Monter le son'});
       await first.writeCache('tasks', [
         {'id': 't0'},
       ]);
       first.dispose();
 
-      final second = LocalStore(sqlite3.open(path));
+      final second = SqlLocalStore(sqlite3.open(path));
       final items = await second.items();
       expect(items.single.payload['title'], 'Monter le son');
       expect((await second.readCache('tasks'))!.single['id'], 't0');

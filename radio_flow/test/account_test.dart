@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:radio_flow/app.dart';
 import 'package:radio_flow/data/local/local_store.dart';
+import 'package:radio_flow/data/local/sql_local_store.dart';
 import 'package:radio_flow/data/sync/connectivity_service.dart';
 import 'package:radio_flow/features/auth/data/auth_repository.dart';
 import 'package:radio_flow/features/auth/data/profile_repository.dart';
@@ -84,7 +85,7 @@ Future<(AccountAuth, LocalStore)> pump(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final auth = AccountAuth();
-  final store = LocalStore(sqlite3.openInMemory());
+  final store = SqlLocalStore(sqlite3.openInMemory());
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
