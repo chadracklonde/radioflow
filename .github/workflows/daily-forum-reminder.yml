@@ -1,0 +1,27 @@
+name: Rappel quotidien du forum
+
+# Chaque matin, notifie toute l'équipe : « Bonjour à tous, n'oubliez pas de poster vos sujets ».
+# L'écriture en base compte aussi comme activité : le projet Supabase gratuit ne se met plus en pause.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC = 08:00 à Kindu
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  remind:
+    name: Envoyer le rappel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler send_daily_forum_reminder()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sf --retry 3 --retry-delay 10 -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/send_daily_forum_reminder" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" -d '{}'
