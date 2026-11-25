@@ -1,0 +1,47 @@
+name: Déploiement web (Firebase Hosting)
+
+# Publie la version web sur https://radio-flow-912ed.web.app à chaque mise à jour de l'application.
+# Nécessite le secret FIREBASE_SERVICE_ACCOUNT (clé JSON d'un compte de service Firebase).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "radio_flow/**"
+      - "firebase.json"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  deploy:
+    name: Compiler et publier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+
+      - name: Compilation web
+        working-directory: radio_flow
+        run: |
+          flutter pub get
+          flutter build web --release
+
+      - name: Publication sur Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: radio-flow-912ed
+          channelId: live
