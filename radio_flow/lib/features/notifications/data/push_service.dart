@@ -132,7 +132,8 @@ final pushServiceProvider = Provider<PushService>(
 /// Écran à ouvrir pour une notification touchée.
 String? routeForNotification(Map<String, String> data) =>
     switch (data['ref_type']) {
-      'proposal' => '/forum',
+      'proposal' => '/redaction',
+      'forum' => '/forum',
       'message' => '/sound',
       _ => null,
     };

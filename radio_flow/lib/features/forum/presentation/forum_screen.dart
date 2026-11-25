@@ -66,7 +66,7 @@ class _ForumScreenState extends ConsumerState<ForumScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _Message(
                 icon: Icons.cloud_off,
-                text: 'Impossible de charger le forum.',
+                text: 'Impossible de charger la rédaction.',
                 action: TextButton(
                   onPressed: () => ref.invalidate(forumProposalsProvider),
                   child: const Text('Réessayer'),
@@ -248,7 +248,7 @@ class _ProposalCard extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  onPressed: () => context.push('/forum/${proposal.id}/thread'),
+                  onPressed: () => context.push('/redaction/${proposal.id}/thread'),
                   icon: const Icon(Icons.forum_outlined),
                   label: const Text('Ouvrir la discussion'),
                 ),

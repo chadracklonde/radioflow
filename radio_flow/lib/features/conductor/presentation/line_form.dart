@@ -72,7 +72,7 @@ class _LineFormState extends ConsumerState<_LineForm> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Ligne ajoutée, mais le sujet n\u2019a pas pu y être lié. Réessayez depuis le Forum.',
+                  'Ligne ajoutée, mais le sujet n\u2019a pas pu y être lié. Réessayez depuis la Rédaction.',
                 ),
               ),
             );

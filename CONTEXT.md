@@ -26,7 +26,8 @@ Auteur / concepteur : Chadrack Tambwe Londe. Cahier des charges validé en septe
 
 ## Workflow
 
-1. **Forum** : conférence de rédaction numérique. Un journaliste soumet une idée (angle, format papier / interview / brève, source), le rédacteur en chef valide en temps réel.
+1. **Rédaction** : conférence de rédaction numérique (propositions de sujets, table `forum_proposals`). Un journaliste soumet une idée (angle, format papier / interview / brève, source), le rédacteur en chef valide en temps réel.
+   Le **Forum** est à part : espace de discussion libre de l'équipe (table `forum_posts`), où l'on parle de tout et de rien. Chaque matin, un message système « Radio Flow » y rappelle de poster ses sujets dans la Rédaction (fonction `send_daily_forum_reminder()`, appelée par GitHub Actions, avec notification push).
 2. **Fils de discussion** (style Teams) : un fil par sujet validé, ouvert à toute l'équipe, pour échanger et uploader l'audio finalisé.
 3. **Conducteur dynamique** : génération automatique des conducteurs du jour (ex. Flash de 07h, Journal de 12h) d'après la grille de la station, avec un **Espace Son** (drive) par édition.
 4. **Nommage automatique** à l'upload : `[Position]_[Nom_Original]_[Date_Du_Jour].[ext]`
@@ -57,10 +58,10 @@ Migrations (à appliquer dans l'ordre) :
 
 - `users.id` référence `auth.users`; le profil est créé automatiquement à l'inscription (rôle par défaut `journalist`). Seul un admin peut changer un rôle; le premier admin se promeut depuis l'éditeur SQL de Supabase : `update public.users set role = 'admin' where email = '...';`
 - Un fil `discussion_threads` est créé automatiquement pour chaque ligne de conducteur.
-- Forum : un journaliste ou un admin propose (titre, angle, format `article` / `interview` / `brief`, source); seul l'admin décide (`approved`, `rejected`, `changes_requested`), puis rattache le sujet à une ligne de conducteur via `conductor_line_id`.
+- Rédaction : un journaliste ou un admin propose (titre, angle, format `article` / `interview` / `brief`, source); seul l'admin décide (`approved`, `rejected`, `changes_requested`), puis rattache le sujet à une ligne de conducteur via `conductor_line_id`.
 - Un conducteur `locked` ou `aired` refuse tout nouvel audio (messages et stockage), sauf pour l'admin.
 - RLS activée partout : lecture pour tout utilisateur connecté; écriture des conducteurs et lignes réservée à l'admin; messages et tâches modifiables par leur auteur ou un admin; upload audio réservé à `admin` et `journalist`.
-- Temps réel activé sur `conductors`, `conductor_lines`, `messages`, `tasks`, `forum_proposals`.
+- Temps réel activé sur `conductors`, `conductor_lines`, `messages`, `tasks`, `forum_proposals`, `forum_posts`.
 - Les deux migrations ont été testées sur un PostgreSQL 16 local (auto-approbation, auto-promotion, upload sur conducteur verrouillé : tous refusés).
 
 ### Projet Supabase (plan gratuit)

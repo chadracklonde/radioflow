@@ -64,6 +64,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   void _open(AppNotification n) {
     switch (n.refType) {
       case 'proposal':
+        context.go('/redaction');
+      case 'forum':
         context.go('/forum');
       case 'message':
         context.go('/sound');

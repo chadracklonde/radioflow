@@ -73,9 +73,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     switch (h.kind) {
       case SearchKind.proposal:
         if (h.proposalApproved) {
-          context.push('/forum/${h.proposalId}/thread');
+          context.push('/redaction/${h.proposalId}/thread');
         } else {
-          context.go('/forum');
+          context.go('/redaction');
         }
       case SearchKind.line:
         context.push('/conductor/${h.conductorId}/line/${h.lineId}');
@@ -83,7 +83,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         if (h.lineId != null && h.conductorId != null) {
           context.push('/conductor/${h.conductorId}/line/${h.lineId}');
         } else if (h.proposalId != null) {
-          context.push('/forum/${h.proposalId}/thread');
+          context.push('/redaction/${h.proposalId}/thread');
         }
       case SearchKind.sound:
         context.go('/sound');

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Les cinq sections principales (maximum conseillé pour une barre de navigation basse).
+/// Les sections principales de l'application.
 class AppDestination {
   const AppDestination(
     this.path,
@@ -19,11 +19,18 @@ class AppDestination {
 
 const appDestinations = <AppDestination>[
   AppDestination(
+    '/redaction',
+    'Rédaction',
+    Icons.edit_note_outlined,
+    Icons.edit_note,
+    'Propositions de sujets et décisions du rédacteur en chef.',
+  ),
+  AppDestination(
     '/forum',
     'Forum',
     Icons.forum_outlined,
     Icons.forum,
-    'Propositions de sujets et décisions du rédacteur en chef.',
+    'Discussion libre de l’équipe : on y parle de tout et de rien.',
   ),
   AppDestination(
     '/conductor',

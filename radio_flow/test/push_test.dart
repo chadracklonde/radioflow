@@ -57,7 +57,8 @@ Future<FakePush> pumpWith(WidgetTester tester, {bool available = true}) async {
 
 void main() {
   test('écran ouvert selon la notification touchée', () {
-    expect(routeForNotification({'ref_type': 'proposal'}), '/forum');
+    expect(routeForNotification({'ref_type': 'proposal'}), '/redaction');
+    expect(routeForNotification({'ref_type': 'forum'}), '/forum');
     expect(routeForNotification({'ref_type': 'message'}), '/sound');
     expect(routeForNotification({'ref_type': ''}), isNull);
     expect(routeForNotification(const {}), isNull);
@@ -76,7 +77,7 @@ void main() {
     (tester) async {
       final push = await pumpWith(tester, available: false);
       expect(push.registered, ['u1']);
-      expect(find.text('Forum'), findsWidgets);
+      expect(find.text('Rédaction'), findsWidgets);
     },
   );
 

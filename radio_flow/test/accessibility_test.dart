@@ -13,12 +13,14 @@ import 'package:radio_flow/features/auth/data/profile_repository.dart';
 import 'package:radio_flow/features/conductor/data/conductor_repository.dart';
 import 'package:radio_flow/features/dashboard/data/dashboard_repository.dart';
 import 'package:radio_flow/features/forum/data/forum_repository.dart';
+import 'package:radio_flow/features/forum_chat/data/forum_chat_repository.dart';
 import 'package:radio_flow/features/sound_space/data/sound_repository.dart';
 import 'package:radio_flow/features/tasks/data/tasks_repository.dart';
 import 'package:radio_flow/features/team/data/team_repository.dart';
 import 'package:radio_flow/features/threads/data/thread_repository.dart';
 
 import 'conductor_test.dart' as ct;
+import 'forum_chat_test.dart' as fct;
 import 'forum_test.dart' as ft;
 import 'tasks_dashboard_test.dart' as td;
 import 'team_test.dart' as tt;
@@ -67,6 +69,7 @@ Future<void> pumpApp(
       overrides: [
         authRepositoryProvider.overrideWithValue(auth),
         forumRepositoryProvider.overrideWithValue(ft.FakeForum()),
+        forumChatRepositoryProvider.overrideWithValue(fct.FakeForumChat()),
         conductorRepositoryProvider.overrideWithValue(
           ct.FakeConductors(
             conductors: [ct.Conductor0.today()],
@@ -91,7 +94,7 @@ Future<void> pumpApp(
   await tester.pumpAndSettle();
 }
 
-/// Fait défiler la liste du Forum (le bouton d'une carte basse est d'abord sous « Proposer un sujet »
+/// Fait défiler la liste de la Rédaction (le bouton d'une carte basse est d'abord sous « Proposer un sujet »
 /// ou sous la barre de navigation), puis ouvre la première discussion de sujet validé.
 Future<void> openFirstDiscussion(WidgetTester tester) async {
   final button = find.text('Ouvrir la discussion');
@@ -108,7 +111,14 @@ Future<void> openFirstDiscussion(WidgetTester tester) async {
 }
 
 // Les sections à contrôler : libellé de l'onglet.
-const tabs = ['Forum', 'Conducteur', 'Espace Son', 'Tâches', 'Tableau de bord'];
+const tabs = [
+  'Rédaction',
+  'Forum',
+  'Conducteur',
+  'Espace Son',
+  'Tâches',
+  'Tableau de bord',
+];
 
 void main() {
   group('contraste des jetons (WCAG)', () {

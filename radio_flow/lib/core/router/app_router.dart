@@ -11,6 +11,7 @@ import '../../features/conductor/presentation/conductor_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/archives/presentation/archives_screen.dart';
 import '../../features/forum/presentation/forum_screen.dart';
+import '../../features/forum_chat/presentation/forum_chat_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/tasks/presentation/tasks_screen.dart';
@@ -48,7 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Écrans plein écran, au-dessus de la coque de navigation.
       GoRoute(
         parentNavigatorKey: _rootKey,
-        path: '/forum/:proposalId/thread',
+        path: '/redaction/:proposalId/thread',
         builder: (_, state) =>
             ThreadScreen(proposalId: state.pathParameters['proposalId']!),
       ),
@@ -104,7 +105,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 GoRoute(
                   path: d.path,
                   builder: (_, _) => switch (d.path) {
-                    '/forum' => const ForumScreen(),
+                    // « Rédaction » = propositions de sujets (ForumScreen, nom historique)
+                    '/redaction' => const ForumScreen(),
+                    '/forum' => const ForumChatScreen(),
                     '/conductor' => const ConductorScreen(),
                     '/sound' => const SoundSpaceScreen(),
                     '/tasks' => const TasksScreen(),
