@@ -210,10 +210,21 @@ class _PostCard extends StatelessWidget {
                   ),
                   const SizedBox(width: Space.xs),
                 ],
-                Expanded(child: Text(author, style: text.titleSmall)),
-                Text(
-                  DateFormat('d MMM, HH:mm', 'fr').format(post.createdAt),
-                  style: TextStyle(color: c.mutedForeground, fontSize: 12),
+                // Auteur et date l'un sous l'autre : pas de débordement à 2x la taille de texte.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(author, style: text.titleSmall),
+                      Text(
+                        DateFormat('d MMM, HH:mm', 'fr').format(post.createdAt),
+                        style: TextStyle(
+                          color: c.mutedForeground,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (canDelete)
                   IconButton(
